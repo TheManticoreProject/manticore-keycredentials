@@ -3,9 +3,9 @@ package mode_list
 import (
 	"fmt"
 
-	"goWhisker/core/config"
-	"goWhisker/ldap"
-	"goWhisker/logger"
+	"shadowcredentials/core/config"
+	"shadowcredentials/ldap"
+	"shadowcredentials/logger"
 )
 
 // Run lists all KeyCredentials for a given user.
@@ -14,6 +14,10 @@ import (
 // - distinguishedName: The distinguished name of the user.
 // - config: The configuration of the application.
 func Run(distinguishedName string, config config.Config) error {
+	if config.Debug {
+		logger.Debug("Starting mode 'list'")
+	}
+
 	// Time to add the keycredential to the user
 	ldapSession := ldap.Session{}
 	ldapSession.InitSession(

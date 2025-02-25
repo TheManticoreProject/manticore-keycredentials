@@ -73,16 +73,25 @@ func NewX509Certificate(subject string, keySize int, notBefore, notAfter time.Ti
 	}
 
 	template := x509.Certificate{
+		// Because x509.CreateCertificate creates a new X.509 v3 certificate.
+		Version: 3,
+
 		SerialNumber: serialNumber,
+
 		Subject: pkix.Name{
 			CommonName: subject,
 		},
+
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
 
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
+		KeyUsage: 0,
+
+		Extensions: []pkix.Extension{},
+
+		ExtKeyUsage: []x509.ExtKeyUsage{},
+
+		BasicConstraintsValid: false,
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &rsaKey.PublicKey, rsaKey)
@@ -102,46 +111,6 @@ func NewX509Certificate(subject string, keySize int, notBefore, notAfter time.Ti
 }
 
 // Export ====================================================================================
-
-// ExportPFX exports the certificate and private key to a PFX file with the specified password.
-//
-// Parameters:
-// - pathToFile: A string representing the path to the file where the PFX will be exported.
-// - password: A string representing the password for the PFX file.
-//
-// Returns:
-// - An error if the export fails, otherwise nil.
-func (x *X509Certificate) ExportPFX(pathToFile, password string) error {
-	// return fmt.Errorf("ExportPFX not implemented")
-	// Create a PFX data structure
-	pfxData, err := pkcs12.Legacy.Encode(x.key, x.certificate, nil, password)
-	if err != nil {
-		return err
-	}
-
-	// Write the PFX data to the specified file
-	if len(pathToFile) != 0 {
-		dir := filepath.Dir(pathToFile)
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-				return err
-			}
-		}
-	}
-
-	pfxFile, err := os.Create(pathToFile)
-	if err != nil {
-		return err
-	}
-	defer pfxFile.Close()
-
-	_, err = pfxFile.Write(pfxData)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // ExportRSAPublicKeyPEM exports the public key to a PEM file.
 //
@@ -203,6 +172,76 @@ func (x *X509Certificate) ExportRSAPrivateKeyPEM(pathToFile string) error {
 
 	privBytes := x509.MarshalPKCS1PrivateKey(x.key)
 	if err := pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ExportCertificatePEM exports the certificate to a PEM file.
+//
+// Parameters:
+// - pathToFile: A string representing the path to the file where the certificate will be exported.
+//
+// Returns:
+// - An error if the export fails, otherwise nil.
+func (x *X509Certificate) ExportCertificatePEM(pathToFile string) error {
+	if len(pathToFile) != 0 {
+		dir := filepath.Dir(pathToFile)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+				return err
+			}
+		}
+	}
+
+	certOut, err := os.Create(pathToFile)
+	if err != nil {
+		return err
+	}
+	defer certOut.Close()
+
+	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: x.certificate.Raw}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ExportCertificatePFX exports the certificate and private key to a PFX file with the specified password.
+//
+// Parameters:
+// - pathToFile: A string representing the path to the file where the PFX will be exported.
+// - password: A string representing the password for the PFX file.
+//
+// Returns:
+// - An error if the export fails, otherwise nil.
+func (x *X509Certificate) ExportCertificatePFX(pathToFile, password string) error {
+	// return fmt.Errorf("ExportPFX not implemented")
+	// Create a PFX data structure
+	pfxData, err := pkcs12.Legacy.Encode(x.key, x.certificate, nil, password)
+	if err != nil {
+		return err
+	}
+
+	// Write the PFX data to the specified file
+	if len(pathToFile) != 0 {
+		dir := filepath.Dir(pathToFile)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+				return err
+			}
+		}
+	}
+
+	pfxFile, err := os.Create(pathToFile)
+	if err != nil {
+		return err
+	}
+	defer pfxFile.Close()
+
+	_, err = pfxFile.Write(pfxData)
+	if err != nil {
 		return err
 	}
 

@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
-	"goWhisker/keycredentiallink/key"
+	"shadowcredentials/keycredentiallink/key"
 	"math/big"
 	"os"
 	"path/filepath"

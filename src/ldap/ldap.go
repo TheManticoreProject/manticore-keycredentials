@@ -1,7 +1,7 @@
 package ldap
 
 import (
-	"goWhisker/logger"
+	"shadowcredentials/logger"
 
 	"crypto/tls"
 	"fmt"

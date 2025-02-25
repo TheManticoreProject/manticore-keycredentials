@@ -1,4 +1,4 @@
-module goWhisker
+module shadowcredentials
 
 go 1.22.1
 

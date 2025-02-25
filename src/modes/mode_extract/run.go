@@ -1,4 +1,4 @@
-package mode_spray
+package mode_extract
 
 import (
 	"shadowcredentials/core/config"
@@ -7,7 +7,7 @@ import (
 
 func Run(distinguishedName string, config config.Config) error {
 	if config.Debug {
-		logger.Debug("Starting mode 'spray'")
+		logger.Debug("Starting mode 'extract'")
 	}
 
 	return nil

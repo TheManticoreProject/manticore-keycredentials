@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"goWhisker/keycredentiallink/key"
+	"shadowcredentials/keycredentiallink/key"
 	"math/rand"
 	"strings"
 	"time"

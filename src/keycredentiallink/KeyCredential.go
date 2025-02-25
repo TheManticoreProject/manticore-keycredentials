@@ -1,9 +1,9 @@
 package keycredentiallink
 
 import (
-	"goWhisker/keycredentiallink/cryptography"
-	"goWhisker/keycredentiallink/key"
-	"goWhisker/utils"
+	"shadowcredentials/keycredentiallink/cryptography"
+	"shadowcredentials/keycredentiallink/key"
+	"shadowcredentials/utils"
 
 	"bytes"
 	"encoding/binary"

