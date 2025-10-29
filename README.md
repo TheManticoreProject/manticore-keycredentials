@@ -1,9 +1,9 @@
 ![](./.github/banner.png)
 
 <p align="center">
-      A cross-platform tool to parse and describe the contents of a raw msDS-KeyCredentialLink data blob. 
+      A cross-platform tool to work with msDS-KeyCredentialLink attributes in Active Directory. 
       <br>
-      <a href="https://github.com/p0dalirius/DescribeNTSecurityDescriptor/actions/workflows/release.yaml" title="Build"><img alt="Build and Release" src="https://github.com/p0dalirius/DescribeNTSecurityDescriptor/actions/workflows/release.yaml/badge.svg"></a>
+      <a href="https://github.com/TheManticoreProject/ShadowCredentials/actions/workflows/release.yaml" title="Build"><img alt="Build and Release" src="https://github.com/TheManticoreProject/ShadowCredentials/actions/workflows/release.yaml/badge.svg"></a>
       <img alt="GitHub release (latest by date)" src="https://img.shields.io/github/v/release/p0dalirius/DescribeNTSecurityDescriptor">
       <a href="https://twitter.com/intent/follow?screen_name=podalirius_" title="Follow"><img src="https://img.shields.io/twitter/follow/podalirius_?label=Podalirius&style=social"></a>
       <a href="https://www.youtube.com/c/Podalirius_?sub_confirmation=1" title="Subscribe"><img alt="YouTube Channel Subscribers" src="https://img.shields.io/youtube/channel/subscribers/UCF_x5O7CSfr82AfNVTKOv_A?style=social"></a>
@@ -12,9 +12,7 @@
 
 ## Features
 
-- [x] Read msDS-KeyCredentialLink data blob from LDAP
-- [x] Read msDS-KeyCredentialLink data blob from a file
-- [x] Read msDS-KeyCredentialLink data blob from raw string
+- [x] 
 
 ## Usage
 
