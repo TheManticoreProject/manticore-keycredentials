@@ -43,7 +43,7 @@ func Run(distinguishedName string, config config.Config) error {
 			query := fmt.Sprintf("(distinguishedName=%s)", distinguishedName)
 
 			attributes := []string{"distinguishedName", "msDS-KeyCredentialLink"}
-			ldapResults, err := ldapSession.QueryWholeSubtree(query, "", attributes)
+			ldapResults, err := ldapSession.QueryWholeSubtree("", query, attributes)
 			if err != nil {
 				return fmt.Errorf("error querying LDAP server: %s", err)
 			}

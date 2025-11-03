@@ -81,6 +81,8 @@ func parseArgs() {
 	subparser_create := ap.AddSubParser("create", "Create a new KeyCredentialLink and attach it to a specified object.")
 	// Configuration flags
 	subparser_create.NewBoolArgument(&debug, "", "--debug", false, "Enable debug mode.")
+
+	subparser_create.NewStringArgument(&distinguishedName, "", "--distinguished-name", "", true, "Distinguished name of the target account.")
 	// Network settings
 	subparser_create_group_network, err := subparser_create.NewArgumentGroup("Network")
 	if err != nil {
@@ -96,7 +98,6 @@ func parseArgs() {
 	if err != nil {
 		fmt.Printf("[error] Error creating ArgumentGroup: %s\n", err)
 	} else {
-		subparser_create_group_keycredential.NewStringArgument(&distinguishedName, "", "--distinguished-name", "", false, "Distinguished name of the target account.")
 		subparser_create_group_keycredential.NewStringArgument(&identifier, "", "--identifier", "", false, "Identifier of the KeyCredential.")
 		subparser_create_group_keycredential.NewStringArgument(&creationTime, "", "--creation-time", "", false, "Creation time of the KeyCredential.")
 		subparser_create_group_keycredential.NewStringArgument(&lastLogonTime, "", "--last-logon-time", "", false, "Last logon time of the KeyCredential.")
@@ -135,6 +136,14 @@ func parseArgs() {
 	// extract ==================================================================================================================
 	subparser_extract := ap.AddSubParser("extract", "Extract a KeyCredentialLink from an object.")
 	subparser_extract.NewBoolArgument(&debug, "", "--debug", false, "Enable debug mode.")
+	// Export certificate
+	subparser_extract_group_export, err := subparser_create.NewRequiredMutuallyExclusiveArgumentGroup("Export certificate")
+	if err != nil {
+		fmt.Printf("[error] Error creating ArgumentGroup: %s\n", err)
+	} else {
+		subparser_extract_group_export.NewBoolArgument(&exportPem, "", "--export-pem", false, "Export the certificate in PEM format.")
+		subparser_extract_group_export.NewBoolArgument(&exportPfx, "", "--export-pfx", false, "Export the certificate in PFX format.")
+	}
 
 	// find ==================================================================================================================
 	subparser_find := ap.AddSubParser("find", "Find objects with a KeyCredentialLink matching a specified value.")
@@ -231,7 +240,7 @@ func parseArgs() {
 func main() {
 	parseArgs()
 
-	creds, err := credentials.NewCredentials(authUsername, authDomain, authPassword, authHashes)
+	creds, err := credentials.NewCredentials(authDomain, authUsername, authPassword, authHashes)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error creating credentials struct: %s", err))
 	}
@@ -250,47 +259,48 @@ func main() {
 		},
 	}
 
-	if mode == "attach" {
+	switch mode {
+	case "attach":
 		err := mode_attach.Run(distinguishedName, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_attach: %s", err))
 		}
-	} else if mode == "create" {
+	case "create":
 		err := mode_create.Run(distinguishedName, identifier, creationTime, lastLogonTime, notBeforeTime, notAfterTime, deviceId, keySize, exportPem, exportPfx, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_create: %s", err))
 		}
-	} else if mode == "extract" {
+	case "extract":
 		err := mode_extract.Run(distinguishedName, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_extract: %s", err))
 		}
-	} else if mode == "flush" {
+	case "flush":
 		err := mode_flush.Run(distinguishedName, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_flush: %s", err))
 		}
-	} else if mode == "list" {
+	case "list":
 		err := mode_list.Run(distinguishedName, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_list: %s", err))
 		}
-	} else if mode == "remove" {
+	case "remove":
 		err := mode_remove.Run(distinguishedName, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_remove: %s", err))
 		}
-	} else if mode == "spray" {
+	case "spray":
 		err := mode_spray.Run(distinguishedName, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_spray: %s", err))
 		}
-	} else if mode == "info" {
+	case "info":
 		err := mode_info.Run(distinguishedName, config)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("Error running mode_info: %s", err))
 		}
-	} else {
+	default:
 		logger.Warn(fmt.Sprintf("Invalid mode: %s", mode))
 	}
 

@@ -47,7 +47,7 @@ func Run(distinguishedName string, config config.Config) error {
 		}
 
 		attributes := []string{"distinguishedName", "msDS-KeyCredentialLink"}
-		ldapResults, err := ldapSession.QueryWholeSubtree(query, "", attributes)
+		ldapResults, err := ldapSession.QueryWholeSubtree("", query, attributes)
 		if err != nil {
 			return fmt.Errorf("error querying LDAP server: %s", err)
 		}
@@ -68,6 +68,18 @@ func Run(distinguishedName string, config config.Config) error {
 		if len(ldapResults) > 1 {
 			logger.Warn(fmt.Sprintf("Too many objects with distinguishedName '%s' found (%d).", distinguishedName, len(ldapResults)))
 			return fmt.Errorf("too many objects with distinguishedName '%s' found (%d)", distinguishedName, len(ldapResults))
+		}
+
+		if config.Debug {
+			oldValues := ldapResults[0].GetEqualFoldRawAttributeValues("msDS-KeyCredentialLink")
+			if len(oldValues) == 0 {
+				logger.Debug("msDS-KeyCredentialLink currently has no values")
+			} else {
+				logger.Debug(fmt.Sprintf("Existing msDS-KeyCredentialLink values (%d):", len(oldValues)))
+				for idx, v := range oldValues {
+					logger.Debug(fmt.Sprintf(" | [%d] %s", idx, v))
+				}
+			}
 		}
 
 		err = ldapSession.FlushAttributeValues(
