@@ -1,6 +1,8 @@
 package mode_create
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -27,7 +29,13 @@ import (
 // - notAfter: The notAfter time of the KeyCredential.
 // - deviceId: The device ID of the KeyCredential.
 // - keySize: The key size of the KeyCredential.
-// - debug: Whether to enable debug mode.
+// - exportPem: Whether to export the KeyCredential to PEM format.
+// - exportPfx: Whether to export the KeyCredential to PFX format.
+// - config: The configuration of the application.
+//
+// Returns:
+// - An error if the operation fails.
+// - nil if the operation succeeds.
 func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, notAfter, deviceId string, keySize int, exportPem, exportPfx bool, config config.Config) error {
 	if config.Debug {
 		logger.Debug("Starting mode 'create'")
@@ -117,7 +125,20 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 		keyVersion := version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2}
 
 		if len(identifier) == 0 {
-			identifier = "COLlcAvA6VItQ0wTnBW3Z2eChNki336Sug3RfWJAfp0="
+			randomBytes := make([]byte, 32)
+			_, err := rand.Read(randomBytes)
+			if err != nil {
+				return fmt.Errorf("error generating random bytes for identifier: %s", err)
+			}
+			identifier = base64.StdEncoding.EncodeToString(randomBytes)
+		} else {
+			identifierBytes, err := base64.StdEncoding.DecodeString(identifier)
+			if err != nil {
+				return fmt.Errorf("error decoding identifier: %s", err)
+			}
+			if len(identifierBytes) != 32 {
+				return fmt.Errorf("identifier must be 32 bytes data encoded in base64")
+			}
 		}
 
 		creationDateTime := keycredential_utils.NewDateTimeFromTime(*notBeforeTime)
@@ -186,7 +207,10 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 				cert.ExportRSAPrivateKeyPEM(filePrivateKey)
 				logger.Info(fmt.Sprintf(" | Saved PEM private key: %s", filePrivateKey))
 				// Export the public key
-				cert.ExportRSAPublicKeyPEM(fileCertificatePem)
+				err = cert.ExportPFX(fileCertificatePem, "admin")
+				if err != nil {
+					return fmt.Errorf("error exporting PFX certificate: %s", err)
+				}
 				logger.Info(fmt.Sprintf(" | Saved PEM certificate: %s", fileCertificatePem))
 
 				logger.Info("You can now get a TGT for this account using https://github.com/dirkjanm/PKINITtools with this command:")
