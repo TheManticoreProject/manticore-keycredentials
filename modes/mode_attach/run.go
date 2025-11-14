@@ -1,9 +1,12 @@
 package mode_attach
 
 import (
-	"github.com/TheManticoreProject/Manticore/logger"
+	"fmt"
 
-	"github.com/TheManticoreProject/ShadowCredentials/config"
+	"github.com/TheManticoreProject/Manticore/logger"
+	"github.com/TheManticoreProject/Manticore/network/ldap"
+
+	"github.com/TheManticoreProject/KeyCredentialLink/config"
 )
 
 // Run attaches a KeyCredentialLink to a user.
@@ -18,6 +21,49 @@ import (
 func Run(distinguishedName string, config config.Config) error {
 	if config.Debug {
 		logger.Debug("Starting mode 'attach'")
+	}
+
+	ldapSession, err := ldap.NewSession(
+		config.Network.DomainController,
+		config.Network.LDAP.LDAPPort,
+		config.Credentials,
+		config.Network.LDAP.UseLdaps,
+		false,
+	)
+	if err != nil {
+		return fmt.Errorf("error creating LDAP session: %s", err)
+	}
+
+	connected, err := ldapSession.Connect()
+	if err != nil {
+		return fmt.Errorf("error connecting to LDAP server: %s", err)
+	}
+
+	if connected {
+		query := fmt.Sprintf("(distinguishedName=%s)", distinguishedName)
+		attributes := []string{"distinguishedName", "msDS-KeyCredentialLink"}
+		ldapResults, err := ldapSession.QueryWholeSubtree("", query, attributes)
+		if err != nil {
+			return fmt.Errorf("error querying LDAP server: %s", err)
+		}
+
+		if len(ldapResults) == 0 {
+			logger.Warn(fmt.Sprintf("No objects with distinguishedName '%s' found.", distinguishedName))
+			return fmt.Errorf("no objects with distinguishedName '%s' found", distinguishedName)
+		}
+
+		if len(ldapResults) > 1 {
+			logger.Warn(fmt.Sprintf("More than one object with distinguishedName '%s' found (%d).", distinguishedName, len(ldapResults)))
+			return fmt.Errorf("more than one object with distinguishedName '%s' found (%d)", distinguishedName, len(ldapResults))
+		}
+
+		msDSKeyCredentialLinkValues := ldapResults[0].GetAttributeValues("msDS-KeyCredentialLink")
+		logger.Info(fmt.Sprintf("Found %d msDS-KeyCredentialLink values for '%s'", len(msDSKeyCredentialLinkValues), distinguishedName))
+		if config.Debug {
+			for k, msdskcl := range msDSKeyCredentialLinkValues {
+				logger.Debug(fmt.Sprintf("(%d/%d): %s", k+1, len(msDSKeyCredentialLinkValues), msdskcl))
+			}
+		}
 	}
 
 	return nil

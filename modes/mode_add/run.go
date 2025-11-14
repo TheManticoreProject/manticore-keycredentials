@@ -1,7 +1,8 @@
-package mode_remove
+package mode_add
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
@@ -9,19 +10,19 @@ import (
 	"github.com/TheManticoreProject/KeyCredentialLink/config"
 )
 
-// Run removes a KeyCredentialLink from a user.
+// Run adds a KeyCredentialLink from a user.
 //
 // Parameters:
 // - distinguishedName: The distinguished name of the user.
-// - valueToRemove: The value to remove from the msDS-KeyCredentialLink attribute.
+// - valueToAdd: The value to add from the msDS-KeyCredentialLink attribute.
 // - config: The configuration of the application.
 //
 // Returns:
 // - An error if the operation fails.
 // - nil if the operation succeeds.
-func Run(distinguishedName string, valueToRemove string, config config.Config) error {
+func Run(distinguishedName string, valueToAdd string, config config.Config) error {
 	if config.Debug {
-		logger.Debug("Starting mode 'remove'")
+		logger.Debug("Starting mode 'add'")
 	}
 
 	ldapSession, err := ldap.NewSession(
@@ -65,35 +66,40 @@ func Run(distinguishedName string, valueToRemove string, config config.Config) e
 
 		msDSKeyCredentialLinkValues := ldapResults[0].GetAttributeValues("msDS-KeyCredentialLink")
 		logger.Info(fmt.Sprintf("Found %d msDS-KeyCredentialLink values for '%s'", len(msDSKeyCredentialLinkValues), distinguishedName))
-		keptValues := []string{}
-		for k, msdskcl := range msDSKeyCredentialLinkValues {
-			if config.Debug {
+		if config.Debug {
+			for k, msdskcl := range msDSKeyCredentialLinkValues {
 				logger.Debug(fmt.Sprintf("(%d/%d): %s", k+1, len(msDSKeyCredentialLinkValues), msdskcl))
 			}
-			if msdskcl != valueToRemove {
-				keptValues = append(keptValues, msdskcl)
+		}
+
+		newMSDSKeyCredentialLinkValues := []string{valueToAdd}
+		for _, msdskcl := range msDSKeyCredentialLinkValues {
+			if !slices.Contains(newMSDSKeyCredentialLinkValues, msdskcl) {
+				newMSDSKeyCredentialLinkValues = append(newMSDSKeyCredentialLinkValues, msdskcl)
+			} else {
+				if config.Debug {
+					logger.Debug(fmt.Sprintf("Value '%s' already exists in msDS-KeyCredentialLink", msdskcl))
+				}
 			}
 		}
 
-		err = ldapSession.Modify(
-			&ldap.ModifyRequest{
-				DistinguishedName: ldapResults[0].GetAttributeValue("distinguishedName"),
-				Attributes: []*ldap.Action{
-					{
-						Attribute:     "msDS-KeyCredentialLink",
-						ReplaceValues: keptValues,
-					},
-				},
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("error flushing attribute values: %s", err)
+		if config.Debug {
+			logger.Info(fmt.Sprintf("New msDS-KeyCredentialLink values: %d", len(newMSDSKeyCredentialLinkValues)))
+			for k, msdskcl := range newMSDSKeyCredentialLinkValues {
+				logger.Debug(fmt.Sprintf("(%d/%d): %s", k+1, len(newMSDSKeyCredentialLinkValues), msdskcl))
+			}
 		}
 
-		logger.Info(fmt.Sprintf("Successfully flushed the msDS-KeyCredentialLink attribute of '%s'", distinguishedName))
-	}
+		err = ldapSession.OverwriteAttributeValues(
+			distinguishedName,
+			"msDS-KeyCredentialLink",
+			newMSDSKeyCredentialLinkValues,
+		)
+		if err != nil {
+			return fmt.Errorf("error replacing attribute values: %s", err)
+		}
 
-	logger.Info(fmt.Sprintf("Successfully removed the msDS-KeyCredentialLink attribute of '%s'", distinguishedName))
+	}
 
 	return nil
 }

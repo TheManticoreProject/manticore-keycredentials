@@ -4,16 +4,21 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"math/big"
 	"time"
 
+	"github.com/TheManticoreProject/KeyCredentialLink/config"
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/utils"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/crypto"
-	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
-	"github.com/TheManticoreProject/ShadowCredentials/config"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/blob"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/magic"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/crypto"
+	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 
 	"github.com/TheManticoreProject/Manticore/windows/guid"
 )
@@ -41,15 +46,17 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 		logger.Debug("Starting mode 'create'")
 	}
 
-	// Time to add the keycredential to the user
-	ldapSession := ldap.Session{}
-	ldapSession.InitSession(
+	ldapSession, err := ldap.NewSession(
 		config.Network.DomainController,
 		config.Network.LDAP.LDAPPort,
 		config.Credentials,
 		config.Network.LDAP.UseLdaps,
 		false,
 	)
+	if err != nil {
+		return fmt.Errorf("error creating LDAP session: %s", err)
+	}
+
 	connected, err := ldapSession.Connect()
 	if err != nil {
 		return fmt.Errorf("error connecting to LDAP server: %s", err)
@@ -122,7 +129,7 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 		}
 
 		// Prepare values for the KeyCredential
-		keyVersion := version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2}
+		keyVersion := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
 
 		if len(identifier) == 0 {
 			randomBytes := make([]byte, 32)
@@ -161,13 +168,29 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 			logger.Debug(fmt.Sprintf("DeviceId: %s", deviceIdGUID.ToFormatD()))
 		}
 
-		kc := keycredential.NewKeyCredential(
+		rsaPublicKey := cert.GetRSAPublicKey()
+		publicExponentBytes := big.NewInt(int64(rsaPublicKey.E)).Bytes()
+		bcryptRsaPublicKey := keys.BCRYPT_RSA_PUBLIC_KEY{
+			Magic: magic.BCRYPT_KEY_BLOB{Magic: magic.BCRYPT_RSAPUBLIC_MAGIC},
+			Header: headers.BCRYPT_RSA_KEY_BLOB{
+				CbPublicExp: uint32(len(publicExponentBytes)),
+				CbModulus:   uint32(len(rsaPublicKey.N.Bytes())),
+				CbPrime1:    0,
+				CbPrime2:    0,
+			},
+			Content: blob.BCRYPT_RSA_PUBLIC_BLOB{
+				Modulus:        []byte(rsaPublicKey.N.Bytes()),
+				PublicExponent: publicExponentBytes,
+			},
+		}
+
+		kc := keycredentiallink.NewKeyCredentialLink(
 			keyVersion,
 			identifier,
-			cert.GetRSAKeyMaterial(),
-			*deviceIdGUID,
-			creationDateTime,
-			lastLogonDateTime,
+			&bcryptRsaPublicKey,
+			deviceIdGUID,
+			&creationDateTime,
+			&lastLogonDateTime,
 		)
 		if config.Debug {
 			kc.Describe(0)

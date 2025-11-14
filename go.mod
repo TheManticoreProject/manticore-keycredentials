@@ -1,14 +1,15 @@
-module github.com/TheManticoreProject/ShadowCredentials
+module github.com/TheManticoreProject/KeyCredentialLink
 
 go 1.24.0
 
 require (
-	github.com/TheManticoreProject/Manticore v1.0.4
+	github.com/TheManticoreProject/Manticore v1.0.9-0.20251113163856-a579e142bf47
 	github.com/TheManticoreProject/goopts v1.2.4
 )
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/TheManticoreProject/winacl v1.2.14 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.12 // indirect

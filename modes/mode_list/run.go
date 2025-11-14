@@ -6,10 +6,10 @@ import (
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 
-	"github.com/TheManticoreProject/ShadowCredentials/config"
+	"github.com/TheManticoreProject/KeyCredentialLink/config"
 )
 
-// Run lists all KeyCredentials for a given user.
+// Run lists all KeyCredentialLinks for a given user.
 //
 // Parameters:
 // - distinguishedName: The distinguished name of the user.
@@ -19,15 +19,17 @@ func Run(distinguishedName string, config config.Config) error {
 		logger.Debug("Starting mode 'list'")
 	}
 
-	// Time to add the keycredential to the user
-	ldapSession := ldap.Session{}
-	ldapSession.InitSession(
+	ldapSession, err := ldap.NewSession(
 		config.Network.DomainController,
 		config.Network.LDAP.LDAPPort,
 		config.Credentials,
 		config.Network.LDAP.UseLdaps,
 		false,
 	)
+	if err != nil {
+		return fmt.Errorf("error creating LDAP session: %s", err)
+	}
+
 	connected, err := ldapSession.Connect()
 	if err != nil {
 		return fmt.Errorf("error connecting to LDAP server: %s", err)

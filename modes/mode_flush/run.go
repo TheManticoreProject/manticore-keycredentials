@@ -6,7 +6,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 
-	"github.com/TheManticoreProject/ShadowCredentials/config"
+	"github.com/TheManticoreProject/KeyCredentialLink/config"
 )
 
 // Run flushes the msDS-KeyCredentialLink attribute of a given user.
@@ -19,15 +19,17 @@ func Run(distinguishedName string, config config.Config) error {
 		logger.Debug("Starting mode 'flush'")
 	}
 
-	// Time to add the keycredential to the user
-	ldapSession := ldap.Session{}
-	ldapSession.InitSession(
+	ldapSession, err := ldap.NewSession(
 		config.Network.DomainController,
 		config.Network.LDAP.LDAPPort,
 		config.Credentials,
 		config.Network.LDAP.UseLdaps,
 		false,
 	)
+	if err != nil {
+		return fmt.Errorf("error creating LDAP session: %s", err)
+	}
+
 	connected, err := ldapSession.Connect()
 	if err != nil {
 		return fmt.Errorf("error connecting to LDAP server: %s", err)
@@ -86,9 +88,8 @@ func Run(distinguishedName string, config config.Config) error {
 			ldapResults[0].GetAttributeValue("distinguishedName"),
 			"msDS-KeyCredentialLink",
 		)
-
 		if err != nil {
-			return fmt.Errorf("error adding value to attribute: %s", err)
+			return fmt.Errorf("error flushing attribute values: %s", err)
 		} else {
 			logger.Info(fmt.Sprintf("Successfully flushed the msDS-KeyCredentialLink attribute of '%s'", distinguishedName))
 		}
