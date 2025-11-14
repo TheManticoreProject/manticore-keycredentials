@@ -31,7 +31,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22.1'
+          go-version: '1.24.0'
 
       - name: Build Binary
         env:
@@ -39,7 +39,6 @@ jobs:
           GOARCH: ${{ matrix.arch }}
         run: |
           mkdir -p build
-          OUTPUT_PATH="../build/${{ matrix.binaryname }}-${{ matrix.os }}-${{ matrix.arch }}"
+          OUTPUT_PATH="./build/${{ matrix.binaryname }}-${{ matrix.os }}-${{ matrix.arch }}"
           # Build the binary
-          cd ./src/;
           go build -ldflags="-s -w" -o $OUTPUT_PATH${{ matrix.os == 'windows' && '.exe' || '' }}
