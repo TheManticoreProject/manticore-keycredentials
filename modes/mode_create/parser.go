@@ -11,7 +11,7 @@ func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *
 	// Configuration flags
 	subparser_create.NewBoolArgument(debug, "", "--debug", false, "Enable debug mode.")
 
-	subparser_create.NewStringArgument(distinguishedName, "", "--distinguished-name", "", true, "Distinguished name of the target account.")
+	subparser_create.NewStringArgument(distinguishedName, "-D", "--distinguished-name", "", true, "Distinguished name of the target account.")
 	// Network settings
 	subparser_create_group_network, err := subparser_create.NewArgumentGroup("Network")
 	if err != nil {

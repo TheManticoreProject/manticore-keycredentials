@@ -3,7 +3,7 @@ module github.com/TheManticoreProject/KeyCredentialLink
 go 1.24.0
 
 require (
-	github.com/TheManticoreProject/Manticore v1.0.9-0.20251113163856-a579e142bf47
+	github.com/TheManticoreProject/Manticore v1.0.9-0.20251114143015-03a87f2cc028
 	github.com/TheManticoreProject/goopts v1.2.4
 )
 

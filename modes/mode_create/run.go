@@ -4,17 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/TheManticoreProject/KeyCredentialLink/config"
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/utils"
-	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys"
-	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/blob"
-	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
-	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/magic"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/crypto"
 	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
@@ -168,26 +163,15 @@ func Run(distinguishedName, identifier, creationTime, lastLogonTime, notBefore, 
 			logger.Debug(fmt.Sprintf("DeviceId: %s", deviceIdGUID.ToFormatD()))
 		}
 
-		rsaPublicKey := cert.GetRSAPublicKey()
-		publicExponentBytes := big.NewInt(int64(rsaPublicKey.E)).Bytes()
-		bcryptRsaPublicKey := keys.BCRYPT_RSA_PUBLIC_KEY{
-			Magic: magic.BCRYPT_KEY_BLOB{Magic: magic.BCRYPT_RSAPUBLIC_MAGIC},
-			Header: headers.BCRYPT_RSA_KEY_BLOB{
-				CbPublicExp: uint32(len(publicExponentBytes)),
-				CbModulus:   uint32(len(rsaPublicKey.N.Bytes())),
-				CbPrime1:    0,
-				CbPrime2:    0,
-			},
-			Content: blob.BCRYPT_RSA_PUBLIC_BLOB{
-				Modulus:        []byte(rsaPublicKey.N.Bytes()),
-				PublicExponent: publicExponentBytes,
-			},
+		bcryptRsaPublicKey, err := cert.ExportRSAPublicKeyBCrypt()
+		if err != nil {
+			return fmt.Errorf("error exporting RSA public key to BCRYPT_RSA_PUBLIC_KEY: %s", err)
 		}
 
 		kc := keycredentiallink.NewKeyCredentialLink(
 			keyVersion,
 			identifier,
-			&bcryptRsaPublicKey,
+			bcryptRsaPublicKey,
 			deviceIdGUID,
 			&creationDateTime,
 			&lastLogonDateTime,

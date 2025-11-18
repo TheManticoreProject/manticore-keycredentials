@@ -10,7 +10,7 @@ func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *
 	subparser_flush := ap.AddSubParser("flush", "Flush the msDS-KeyCredentialLink attribute of an object.")
 	// Configuration flags
 	subparser_flush.NewBoolArgument(debug, "", "--debug", false, "Enable debug mode.")
-	subparser_flush.NewStringArgument(distinguishedName, "", "--distinguished-name", "", false, "Distinguished name of the target account.")
+	subparser_flush.NewStringArgument(distinguishedName, "-D", "--distinguished-name", "", false, "Distinguished name of the target account.")
 	// Network settings
 	subparser_flush_group_network, err := subparser_flush.NewArgumentGroup("Network")
 	if err != nil {

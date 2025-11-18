@@ -11,7 +11,7 @@ func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *
 
 	// Configuration flags
 	subparser_extract.NewBoolArgument(debug, "", "--debug", false, "Enable debug mode.")
-	subparser_extract.NewStringArgument(distinguishedName, "", "--distinguished-name", "", true, "Distinguished name of the target account.")
+	subparser_extract.NewStringArgument(distinguishedName, "-D", "--distinguished-name", "", true, "Distinguished name of the target account.")
 
 	// Export certificate
 	subparser_extract_group_export, err := subparser_extract.NewRequiredMutuallyExclusiveArgumentGroup("Export certificate")

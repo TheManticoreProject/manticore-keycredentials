@@ -10,7 +10,7 @@ func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *
 	subparser_add := ap.AddSubParser("add", "Add a KeyCredentialLink value to a specified object.")
 	// Configuration flags
 	subparser_add.NewBoolArgument(debug, "", "--debug", false, "Enable debug mode.")
-	subparser_add.NewStringArgument(distinguishedName, "", "--distinguished-name", "", false, "Distinguished name of the target account.")
+	subparser_add.NewStringArgument(distinguishedName, "-D", "--distinguished-name", "", false, "Distinguished name of the target account.")
 	subparser_add.NewStringArgument(valueToAdd, "", "--value-to-add", "", true, "Value to add to the msDS-KeyCredentialLink attribute.")
 	// Network settings
 	subparser_add_group_network, err := subparser_add.NewArgumentGroup("Network")
