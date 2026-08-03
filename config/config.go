@@ -12,8 +12,12 @@ type Config struct {
 }
 
 type LDAP struct {
-	UseLdaps bool
-	LDAPPort int
+	UseLdaps    bool
+	UseKerberos bool
+	LDAPPort    int
+	// SPNHostname overrides the hostname used to build the Kerberos ldap SPN when
+	// the domain controller is reached by IP. Empty means use the connection host.
+	SPNHostname string
 }
 
 type Network struct {

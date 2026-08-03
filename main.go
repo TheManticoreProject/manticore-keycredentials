@@ -1,22 +1,24 @@
 package main
 
 import (
+	"os"
+
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/windows/credentials"
 	"github.com/TheManticoreProject/goopts/parser"
 
-	"github.com/TheManticoreProject/KeyCredentialLink/config"
+	"github.com/TheManticoreProject/manticore-keycredentials/cli"
+	"github.com/TheManticoreProject/manticore-keycredentials/config"
 
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_add"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_associate"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_attach"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_create"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_extract"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_find"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_flush"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_info"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_list"
-	"github.com/TheManticoreProject/KeyCredentialLink/modes/mode_remove"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_attach"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_create"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_describe"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_enroll"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_extract"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_find"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_flush"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_list"
+	"github.com/TheManticoreProject/manticore-keycredentials/mode_remove"
 
 	"fmt"
 )
@@ -26,15 +28,21 @@ var (
 
 	distinguishedName string
 
+	// Target selection and safety, shared by the multi-target modes
+	targetOptions cli.TargetOptions
+	safetyOptions cli.SafetyOptions
+
 	// KeyCredential source
 	pfxPassword    string
-	privateKey     string
-	publicKey      string
 	pfxCertificate string
+	pemFile        string
 	exportPem      bool
 	exportPfx      bool
+	exportDer      bool
+	extractOutput  string
 
-	// KeyCredential build
+	// Certificate build
+	subject       string
 	identifier    string
 	creationTime  string
 	lastLogonTime string
@@ -42,18 +50,17 @@ var (
 	notAfterTime  string
 	deviceId      string
 	keySize       int
-
-	// KeyCredential value to remove
-	valueToRemove string
-	valueToAdd    string
+	createOutput  string
 
 	// Configuration
-	useLdaps bool
-	debug    bool
+	debug bool
 
-	// Network settings
+	// LDAP Connection Settings
 	domainController string
+	dcHost           string
 	ldapPort         int
+	useLdaps         bool
+	useKerberos      bool
 	dnsNameServer    string
 
 	// Authentication details
@@ -61,31 +68,36 @@ var (
 	authUsername string
 	authPassword string
 	authHashes   string
+	authAesKey   string
 	authNoPass   bool
+	ticketCCache string
+	ticketKirbi  string
 )
 
 func parseArgs() {
-	ap := parser.ArgumentsParser{Banner: "KeyCredentialLink - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.0.0"}
+	ap := parser.ArgumentsParser{Banner: "manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.0.0"}
+	ap.SetOptShowBannerOnHelp(true)
+	ap.SetOptShowBannerOnRun(true)
 	ap.SetupSubParsing("mode", &mode, true)
 
-	// add ==================================================================================================================
-	mode_add.SetupSubParser(&ap, &debug, &distinguishedName, &valueToAdd, &useLdaps, &ldapPort, &domainController, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authNoPass)
 	// attach ==================================================================================================================
-	mode_attach.SetupSubParser(&ap, &debug, &distinguishedName, &pfxPassword, &privateKey, &publicKey, &pfxCertificate)
+	mode_attach.SetupSubParser(&ap, &debug, &targetOptions, &safetyOptions, &pfxCertificate, &pfxPassword, &pemFile, &identifier, &creationTime, &lastLogonTime, &deviceId, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// create ==========================================================================================================================
-	mode_create.SetupSubParser(&ap, &debug, &distinguishedName, &identifier, &creationTime, &lastLogonTime, &notBeforeTime, &notAfterTime, &deviceId, &keySize, &exportPem, &exportPfx, &useLdaps, &ldapPort, &domainController, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authNoPass)
+	mode_create.SetupSubParser(&ap, &debug, &subject, &notBeforeTime, &notAfterTime, &keySize, &createOutput, &pfxPassword)
+	// describe ==================================================================================================================
+	mode_describe.SetupSubParser(&ap, &debug, &distinguishedName, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
+	// enroll ==================================================================================================================
+	mode_enroll.SetupSubParser(&ap, &debug, &targetOptions, &safetyOptions, &identifier, &creationTime, &lastLogonTime, &notBeforeTime, &notAfterTime, &deviceId, &keySize, &exportPem, &exportPfx, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// extract ==================================================================================================================
-	mode_extract.SetupSubParser(&ap, &debug, &distinguishedName, &exportPem, &exportPfx)
+	mode_extract.SetupSubParser(&ap, &debug, &distinguishedName, &extractOutput, &exportPem, &exportDer, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// find ==================================================================================================================
-	mode_find.SetupSubParser(&ap, &debug, &distinguishedName)
+	mode_find.SetupSubParser(&ap, &debug, &distinguishedName, &pfxCertificate, &pfxPassword, &pemFile, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// flush ==========================================================================================================================
-	mode_flush.SetupSubParser(&ap, &debug, &distinguishedName, &useLdaps, &ldapPort, &domainController, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authNoPass)
+	mode_flush.SetupSubParser(&ap, &debug, &distinguishedName, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// list ==================================================================================================================
-	mode_list.SetupSubParser(&ap, &debug, &distinguishedName, &useLdaps, &ldapPort, &domainController, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authNoPass)
+	mode_list.SetupSubParser(&ap, &debug, &targetOptions, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// remove ==================================================================================================================
-	mode_remove.SetupSubParser(&ap, &debug, &distinguishedName, &valueToRemove, &useLdaps, &ldapPort, &domainController, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authNoPass)
-	// associate ==================================================================================================================
-	mode_associate.SetupSubParser(&ap, &debug, &distinguishedName)
+	mode_remove.SetupSubParser(&ap, &debug, &targetOptions, &safetyOptions, &pfxCertificate, &pfxPassword, &pemFile, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 
 	// Parse arguments
 	ap.Parse()
@@ -105,6 +117,52 @@ func main() {
 	creds, err := credentials.NewCredentials(authDomain, authUsername, authPassword, authHashes)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error creating credentials struct: %s", err))
+		os.Exit(1)
+	}
+
+	// An AES key is only usable over Kerberos, so requesting one implies -k rather
+	// than being a separate choice the caller has to remember to make.
+	if len(authAesKey) > 0 {
+		if err := creds.SetAESKey(authAesKey); err != nil {
+			logger.Warn(fmt.Sprintf("Error setting AES key: %s", err))
+			os.Exit(1)
+		}
+		if !useKerberos {
+			logger.Debug("An AES key was supplied, enabling Kerberos authentication")
+			useKerberos = true
+		}
+	}
+
+	// A Kerberos ticket (ccache or .kirbi) is itself the credential for
+	// pass-the-ticket and only works over Kerberos, so supplying one implies -k,
+	// just like an AES key.
+	if len(ticketCCache) > 0 {
+		if err := creds.SetCCache(ticketCCache); err != nil {
+			logger.Warn(fmt.Sprintf("Error setting ccache: %s", err))
+			os.Exit(1)
+		}
+	}
+	if len(ticketKirbi) > 0 {
+		if err := creds.SetKirbi(ticketKirbi); err != nil {
+			logger.Warn(fmt.Sprintf("Error setting kirbi: %s", err))
+			os.Exit(1)
+		}
+	}
+	if len(ticketCCache) > 0 || len(ticketKirbi) > 0 {
+		if !useKerberos {
+			logger.Debug("A Kerberos ticket was supplied, enabling Kerberos authentication")
+			useKerberos = true
+		}
+	}
+
+	// --no-pass selects "no secret". Pass-the-ticket now covers the -k use case, so
+	// a ticket (handled above) is the way to bind without a password. --no-pass on
+	// its own leaves the session with no usable credential and would fall through to
+	// an anonymous bind the DC rejects at query time with a cryptic operations
+	// error. Fail early with a clear message.
+	if authNoPass && len(ticketCCache) == 0 && len(ticketKirbi) == 0 {
+		logger.Warn("Passwordless authentication (--no-pass) needs a Kerberos ticket: pass --ticket-ccache or --ticket-kirbi, or provide a secret with -p/--password, -H/--hashes, or --aes-key.")
+		os.Exit(1)
 	}
 
 	config := config.Config{
@@ -112,8 +170,10 @@ func main() {
 		Credentials: creds,
 		Network: config.Network{
 			LDAP: config.LDAP{
-				UseLdaps: useLdaps,
-				LDAPPort: ldapPort,
+				UseLdaps:    useLdaps,
+				UseKerberos: useKerberos,
+				LDAPPort:    ldapPort,
+				SPNHostname: dcHost,
 			},
 			DNSNameServer:    dnsNameServer,
 			DomainController: domainController,
@@ -121,66 +181,47 @@ func main() {
 		},
 	}
 
-	switch mode {
-
-	case "add":
-		err := mode_add.Run(distinguishedName, valueToAdd, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_add: %s", err))
-		}
-
-	case "associate":
-		err := mode_associate.Run(distinguishedName, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_associate: %s", err))
-		}
-
-	case "attach":
-		err := mode_attach.Run(distinguishedName, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_attach: %s", err))
-		}
-
-	case "create":
-		err := mode_create.Run(distinguishedName, identifier, creationTime, lastLogonTime, notBeforeTime, notAfterTime, deviceId, keySize, exportPem, exportPfx, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_create: %s", err))
-		}
-
-	case "extract":
-		err := mode_extract.Run(distinguishedName, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_extract: %s", err))
-		}
-
-	case "flush":
-		err := mode_flush.Run(distinguishedName, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_flush: %s", err))
-		}
-
-	case "info":
-		err := mode_info.Run(distinguishedName, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_info: %s", err))
-		}
-
-	case "list":
-		err := mode_list.Run(distinguishedName, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_list: %s", err))
-		}
-
-	case "remove":
-		err := mode_remove.Run(distinguishedName, valueToRemove, config)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error running mode_remove: %s", err))
-		}
-
-	default:
-		logger.Warn(fmt.Sprintf("Invalid mode: %s", mode))
-
+	// A mode that fails must be reflected in the exit code so a caller can detect
+	// it, rather than always exiting 0.
+	if err := dispatch(config); err != nil {
+		logger.Warn(fmt.Sprintf("Error running mode_%s: %s", mode, err))
+		logger.Print("Done.")
+		os.Exit(1)
 	}
 
-	logger.Info("All done!")
+	logger.Print("Done.")
+}
+
+// dispatch runs the selected mode and returns its error.
+//
+// Parameters:
+//
+//	config (config.Config): The configuration of the application.
+//
+// Returns:
+//
+//	The error returned by the mode, or an error for an unknown mode.
+func dispatch(config config.Config) error {
+	switch mode {
+	case "attach":
+		return mode_attach.Run(targetOptions, safetyOptions, pfxCertificate, pfxPassword, pemFile, identifier, creationTime, lastLogonTime, deviceId, config)
+	case "create":
+		return mode_create.Run(subject, notBeforeTime, notAfterTime, keySize, createOutput, pfxPassword, config)
+	case "describe":
+		return mode_describe.Run(distinguishedName, config)
+	case "enroll":
+		return mode_enroll.Run(targetOptions, safetyOptions, identifier, creationTime, lastLogonTime, notBeforeTime, notAfterTime, deviceId, keySize, exportPem, exportPfx, config)
+	case "extract":
+		return mode_extract.Run(distinguishedName, extractOutput, exportPem, exportDer, config)
+	case "find":
+		return mode_find.Run(distinguishedName, pfxCertificate, pfxPassword, pemFile, config)
+	case "flush":
+		return mode_flush.Run(distinguishedName, config)
+	case "list":
+		return mode_list.Run(targetOptions, config)
+	case "remove":
+		return mode_remove.Run(targetOptions, safetyOptions, pfxCertificate, pfxPassword, pemFile, config)
+	default:
+		return fmt.Errorf("invalid mode '%s'", mode)
+	}
 }

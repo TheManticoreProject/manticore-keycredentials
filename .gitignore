@@ -25,4 +25,11 @@ go.work.sum
 .env
 
 # Builds dir
-./bin/
+/bin/
+
+# Exported key material written by create/enroll/extract (default ./keys/)
+/keys/
+
+# Private build-time working documents (plan.md, design notes, scratch scripts,
+# captured samples). Never committed.
+.private/*
