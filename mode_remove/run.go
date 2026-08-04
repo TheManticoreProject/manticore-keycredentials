@@ -14,12 +14,12 @@ import (
 	"github.com/TheManticoreProject/manticore-keycredentials/utils"
 )
 
-// plan is what would change on one target object: the values to keep and how many
-// were matched for removal.
+// plan is what would change on one target object: the raw values matched for
+// removal, and how many values are left untouched.
 type plan struct {
 	distinguishedName string
-	kept              []string
-	removed           int
+	removed           []string
+	kept              int
 }
 
 // Run removes a single specified certificate from one or more target objects.
@@ -86,8 +86,8 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 		return err
 	}
 
-	// Work out, per object, which values would go and which would stay, without
-	// changing anything yet.
+	// Work out, per object, which raw values match and which stay, without changing
+	// anything yet.
 	plans := []plan{}
 	for _, entry := range entries {
 		dn := entry.GetAttributeValue("distinguishedName")
@@ -96,17 +96,20 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 			kc, err := keycredential.ParseValue(rawValue)
 			if err != nil {
 				// An unparsable value cannot be identified, so it is kept.
-				p.kept = append(p.kept, string(rawValue))
+				p.kept++
 				continue
 			}
 			fingerprint, ok := keycredential.Fingerprint(kc)
 			if ok && fingerprint == wantedFingerprint {
-				p.removed++
+				// The exact server-returned value is deleted, so removing the last
+				// matching value clears the attribute instead of leaving an empty
+				// replace that the directory rejects.
+				p.removed = append(p.removed, string(rawValue))
 				continue
 			}
-			p.kept = append(p.kept, string(rawValue))
+			p.kept++
 		}
-		if p.removed > 0 {
+		if len(p.removed) > 0 {
 			plans = append(plans, p)
 		}
 	}
@@ -117,7 +120,7 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 		if k == len(plans)-1 {
 			glyph = "└──"
 		}
-		logger.Print(fmt.Sprintf("  %s \x1b[94m%s\x1b[0m (\x1b[93m%d\x1b[0m to remove, \x1b[93m%d\x1b[0m kept)", glyph, p.distinguishedName, p.removed, len(p.kept)))
+		logger.Print(fmt.Sprintf("  %s \x1b[94m%s\x1b[0m (\x1b[93m%d\x1b[0m to remove, \x1b[93m%d\x1b[0m kept)", glyph, p.distinguishedName, len(p.removed), p.kept))
 	}
 	logger.Print("")
 
@@ -136,8 +139,8 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 			DistinguishedName: p.distinguishedName,
 			Attributes: []*ldap.Action{
 				{
-					Attribute:     "msDS-KeyCredentialLink",
-					ReplaceValues: p.kept,
+					Attribute: "msDS-KeyCredentialLink",
+					DelValues: p.removed,
 				},
 			},
 		})
@@ -146,7 +149,7 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 			logger.Warn(fmt.Sprintf("%s: %s", p.distinguishedName, err))
 			continue
 		}
-		logger.Info(fmt.Sprintf("Removed %d value(s) from '%s'", p.removed, p.distinguishedName))
+		logger.Info(fmt.Sprintf("Removed %d value(s) from '%s'", len(p.removed), p.distinguishedName))
 	}
 
 	if failures > 0 {
