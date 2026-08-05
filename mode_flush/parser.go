@@ -13,6 +13,6 @@ func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *
 	subparser_flush.NewStringArgument(distinguishedName, "-D", "--distinguished-name", "", true, "Distinguished name of the target account.")
 	// Shared groups
 	cli.RegisterLDAPConnectionSettingsGroup(subparser_flush, domainController, dcHost, ldapPort, useLdaps, useKerberos, dnsNameServer)
-	cli.RegisterAuthenticationGroup(subparser_flush, authDomain, authUsername)
-	cli.RegisterSecretGroup(subparser_flush, authNoPass, authPassword, authHashes, authAesKey, ticketCCache, ticketKirbi)
+	cli.RegisterAuthenticationGroup(subparser_flush, authDomain, authUsername, authNoPass)
+	cli.RegisterSecretGroup(subparser_flush, authPassword, authHashes, authAesKey, ticketCCache, ticketKirbi)
 }

@@ -62,7 +62,8 @@ func RegisterLDAPConnectionSettingsGroup(subparser *parser.ArgumentsParser, doma
 //	subparser (*parser.ArgumentsParser): The parser to register the group on.
 //	authDomain (*string): The (FQDN) domain to authenticate to.
 //	authUsername (*string): The user to authenticate as.
-func RegisterAuthenticationGroup(subparser *parser.ArgumentsParser, authDomain *string, authUsername *string) {
+//	authNoPass (*bool): Whether to skip asking for a password.
+func RegisterAuthenticationGroup(subparser *parser.ArgumentsParser, authDomain *string, authUsername *string, authNoPass *bool) {
 	group, err := subparser.NewArgumentGroup("Authentication")
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error creating ArgumentGroup: %s", err))
@@ -70,28 +71,33 @@ func RegisterAuthenticationGroup(subparser *parser.ArgumentsParser, authDomain *
 	}
 	group.NewStringArgument(authDomain, "-d", "--domain", "", false, "Active Directory domain to authenticate to.")
 	group.NewStringArgument(authUsername, "-u", "--username", "", false, "User to authenticate as.")
+	// --no-pass selects "no password", it does not supply a secret, so it does not
+	// belong in the mutually exclusive Secret group: it has to be combinable with the
+	// ticket it accompanies.
+	group.NewBoolArgument(authNoPass, "", "--no-pass", false, "Don't ask for password, the secret is a Kerberos ticket (--ticket-ccache or --ticket-kirbi).")
 }
 
 // RegisterSecretGroup registers the "Secret" argument group on a sub-parser. The
-// group is mutually exclusive and required: exactly one way of authenticating has
-// to be provided.
+// group is mutually exclusive and required: exactly one secret has to be provided.
+//
+// --no-pass is not part of this group. It selects "no password" rather than being a
+// secret of its own, so it lives in the Authentication group and stays combinable
+// with the ticket that carries the actual credential.
 //
 // Parameters:
 //
 //	subparser (*parser.ArgumentsParser): The parser to register the group on.
-//	authNoPass (*bool): Whether to skip asking for a password.
 //	authPassword (*string): The password to authenticate with.
 //	authHashes (*string): The LM:NT hashes to authenticate with.
 //	authAesKey (*string): The AES key to authenticate with.
 //	ticketCCache (*string): Path to a Kerberos credential cache (ccache) holding a TGT.
 //	ticketKirbi (*string): Path to a .kirbi file holding a TGT.
-func RegisterSecretGroup(subparser *parser.ArgumentsParser, authNoPass *bool, authPassword *string, authHashes *string, authAesKey *string, ticketCCache *string, ticketKirbi *string) {
+func RegisterSecretGroup(subparser *parser.ArgumentsParser, authPassword *string, authHashes *string, authAesKey *string, ticketCCache *string, ticketKirbi *string) {
 	group, err := subparser.NewRequiredMutuallyExclusiveArgumentGroup("Secret")
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error creating ArgumentGroup: %s", err))
 		return
 	}
-	group.NewBoolArgument(authNoPass, "", "--no-pass", false, "Don't ask for password (useful for -k).")
 	group.NewStringArgument(authPassword, "-p", "--password", "", false, "Password to authenticate with.")
 	group.NewStringArgument(authHashes, "-H", "--hashes", "", false, "NT/LM hashes, format is LMhash:NThash.")
 	group.NewStringArgument(authAesKey, "", "--aes-key", "", false, "AES key to use for Kerberos Authentication (128 or 256 bits).")

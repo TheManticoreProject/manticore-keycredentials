@@ -155,15 +155,9 @@ func main() {
 		}
 	}
 
-	// --no-pass selects "no secret". Pass-the-ticket now covers the -k use case, so
-	// a ticket (handled above) is the way to bind without a password. --no-pass on
-	// its own leaves the session with no usable credential and would fall through to
-	// an anonymous bind the DC rejects at query time with a cryptic operations
-	// error. Fail early with a clear message.
-	if authNoPass && len(ticketCCache) == 0 && len(ticketKirbi) == 0 {
-		logger.Warn("Passwordless authentication (--no-pass) needs a Kerberos ticket: pass --ticket-ccache or --ticket-kirbi, or provide a secret with -p/--password, -H/--hashes, or --aes-key.")
-		os.Exit(1)
-	}
+	// --no-pass only states that no password is coming; the required Secret group
+	// guarantees one of the other secrets was supplied, so there is nothing left to
+	// check here. It stays accepted for callers that pass it alongside a ticket.
 
 	config := config.Config{
 		Debug:       debug,
