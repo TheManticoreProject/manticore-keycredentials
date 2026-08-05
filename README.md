@@ -134,8 +134,8 @@ Three modes deal in certificates, split by where the key comes from:
 $ ./manticore-keycredentials enroll -h
 ...
   Export certificate:
-    --export-pem    Export the certificate in PEM format. (default: false)
-    --export-pfx    Export the certificate in PFX format. (default: false)
+    --export-pem    Export the certificate in PEM format. Can be combined with --export-pfx. (default: false)
+    --export-pfx    Export the certificate in PFX format. Can be combined with --export-pem. (default: false)
 
   KeyCredential:
     --identifier <string>      Identifier of the KeyCredential. A fresh one is generated per object when omitted. (default: "")
