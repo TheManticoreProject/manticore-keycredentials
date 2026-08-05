@@ -1,7 +1,6 @@
 package mode_enroll
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/utils"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys"
 	"github.com/TheManticoreProject/Manticore/windows/guid"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink"
 	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
@@ -17,6 +17,7 @@ import (
 	"github.com/TheManticoreProject/manticore-keycredentials/certificate"
 	"github.com/TheManticoreProject/manticore-keycredentials/cli"
 	"github.com/TheManticoreProject/manticore-keycredentials/config"
+	"github.com/TheManticoreProject/manticore-keycredentials/keycredential"
 	kcl_utils "github.com/TheManticoreProject/manticore-keycredentials/utils"
 )
 
@@ -154,7 +155,7 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 		return fmt.Errorf("error exporting RSA public key: %s", err)
 	}
 
-	credentialIdentifier, err := resolveIdentifier(identifier)
+	credentialIdentifier, err := resolveIdentifier(identifier, bcryptRsaPublicKey)
 	if err != nil {
 		return err
 	}
@@ -218,17 +219,13 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 	return nil
 }
 
-// resolveIdentifier returns the explicit identifier when one was given, or a fresh
-// random 32-byte identifier encoded in base64.
-func resolveIdentifier(identifier string) (string, error) {
+// resolveIdentifier returns the explicit identifier when one was given, or the
+// KeyID the key material requires.
+func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY) (string, error) {
 	if len(identifier) > 0 {
 		return identifier, nil
 	}
-	randomBytes := make([]byte, 32)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", fmt.Errorf("error generating random bytes for identifier: %s", err)
-	}
-	return base64.StdEncoding.EncodeToString(randomBytes), nil
+	return keycredential.KeyIDForKeyMaterial(keyMaterial)
 }
 
 // parseTimeOrDefault parses an option time string, defaulting to the given time

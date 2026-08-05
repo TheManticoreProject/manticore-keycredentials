@@ -1,7 +1,6 @@
 package mode_attach
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/utils"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys"
 	"github.com/TheManticoreProject/Manticore/windows/guid"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink"
 	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
@@ -133,7 +133,7 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 	for _, entry := range entries {
 		dn := entry.GetAttributeValue("distinguishedName")
 
-		perObjectIdentifier, err := resolveIdentifier(identifier)
+		perObjectIdentifier, err := resolveIdentifier(identifier, keyMaterial)
 		if err != nil {
 			failures++
 			logger.Warn(fmt.Sprintf("%s: %s", dn, err))
@@ -176,25 +176,22 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 	return nil
 }
 
-// resolveIdentifier returns the explicit identifier when one was given, or a fresh
-// random 32-byte identifier encoded in base64.
+// resolveIdentifier returns the explicit identifier when one was given, or the
+// KeyID the key material requires.
 //
 // Parameters:
 //
-//	identifier (string): The explicit identifier, or empty for a random one.
+//	identifier (string): The explicit identifier, or empty to derive it.
+//	keyMaterial (*keys.BCRYPT_RSA_PUBLIC_KEY): The key material of the credential.
 //
 // Returns:
 //
-//	The identifier to use, or an error if random generation fails.
-func resolveIdentifier(identifier string) (string, error) {
+//	The identifier to use, or an error if the KeyID cannot be derived.
+func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY) (string, error) {
 	if len(identifier) > 0 {
 		return identifier, nil
 	}
-	randomBytes := make([]byte, 32)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", fmt.Errorf("error generating random bytes for identifier: %s", err)
-	}
-	return base64.StdEncoding.EncodeToString(randomBytes), nil
+	return keycredential.KeyIDForKeyMaterial(keyMaterial)
 }
 
 // parseTimeOrNow parses an option time string, defaulting to now when it is empty.

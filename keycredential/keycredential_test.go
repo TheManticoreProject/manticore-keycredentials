@@ -3,8 +3,10 @@ package keycredential_test
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"math/big"
 	"os"
@@ -204,6 +206,73 @@ func TestBuiltCredentialIsFindable(t *testing.T) {
 
 	if want := keycredential.FingerprintRSAPublicKey(loaded); parsedFingerprint != want {
 		t.Errorf("attached credential fingerprint = %s, find would look for %s", parsedFingerprint, want)
+	}
+}
+
+// TestKeyIDForKeyMaterialIsSHA256OfKeyMaterial pins the KeyID to the definition in
+// MS-ADTS 2.2.20. The KDC looks a PKINIT key up by this hash, so a KeyID derived from
+// anything else silently produces a credential that cannot authenticate.
+func TestKeyIDForKeyMaterialIsSHA256OfKeyMaterial(t *testing.T) {
+	key, _ := testKey(t, "VICTIM$")
+	keyMaterial := keycredential.BCryptPublicKeyFromRSA(&key.PublicKey)
+
+	keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial)
+	if err != nil {
+		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
+	}
+
+	rawKeyMaterial, err := keyMaterial.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	sum := sha256.Sum256(rawKeyMaterial)
+	if want := base64.StdEncoding.EncodeToString(sum[:]); keyID != want {
+		t.Errorf("KeyIDForKeyMaterial() = %s, want %s", keyID, want)
+	}
+}
+
+// TestBuiltCredentialCarriesDerivedKeyID walks the whole write path: build the
+// credential the way enroll and attach do, marshal it to the attribute value, parse it
+// back, and check the KeyID that landed in the blob is the hash of the key material.
+func TestBuiltCredentialCarriesDerivedKeyID(t *testing.T) {
+	key, _ := testKey(t, "VICTIM$")
+	keyMaterial := keycredential.BCryptPublicKeyFromRSA(&key.PublicKey)
+
+	keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial)
+	if err != nil {
+		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
+	}
+
+	now := keycredential_utils.NewDateTimeFromTime(time.Now())
+	kc := keycredentiallink.NewKeyCredentialLink(
+		version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
+		keyID,
+		keyMaterial,
+		guid.NewGUID(),
+		&now,
+		&now,
+	)
+	rawBytes, err := kc.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	dnWithBinary := ldap.DNWithBinary{DistinguishedName: "CN=VICTIM,DC=x", BinaryData: rawBytes}
+
+	parsed, err := keycredential.ParseValue([]byte(dnWithBinary.String()))
+	if err != nil {
+		t.Fatalf("ParseValue() error = %v", err)
+	}
+
+	parsedKeyMaterial, ok := keycredential.RSAKeyMaterial(parsed)
+	if !ok {
+		t.Fatal("RSAKeyMaterial() ok = false")
+	}
+	want, err := keycredential.KeyIDForKeyMaterial(parsedKeyMaterial)
+	if err != nil {
+		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
+	}
+	if parsed.Identifier != want {
+		t.Errorf("stored KeyID = %s, want SHA256 of the stored key material %s", parsed.Identifier, want)
 	}
 }
 
