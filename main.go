@@ -114,6 +114,15 @@ func parseArgs() {
 func main() {
 	parseArgs()
 
+	// The logger emits every level by default, so --debug has to raise the floor
+	// itself: without this, logger.Debug output appears in runs that did not ask for
+	// it. LevelPrint sits above all others, so results are never filtered either way.
+	if debug {
+		logger.SetLevel(logger.LevelDebug)
+	} else {
+		logger.SetLevel(logger.LevelInfo)
+	}
+
 	creds, err := credentials.NewCredentials(authDomain, authUsername, authPassword, authHashes)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error creating credentials struct: %s", err))
