@@ -3,6 +3,7 @@ package mode_remove
 import (
 	"crypto/rsa"
 	"fmt"
+	"os"
 
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
@@ -32,7 +33,7 @@ type plan struct {
 // Parameters:
 //
 //	targets (cli.TargetOptions): The target selection flags.
-//	safety (cli.SafetyOptions): The dry-run and confirmation flags.
+//	safety (cli.SafetyOptions): The confirmation flag.
 //	pfxCertificate (string): Path to a PFX file holding the certificate to remove.
 //	pfxPassword (string): Password of the PFX file.
 //	pemFile (string): Path to a PEM file holding the certificate to remove.
@@ -44,6 +45,10 @@ type plan struct {
 func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pfxPassword, pemFile string, config config.Config) error {
 	if config.Debug {
 		logger.Debug("Starting mode 'remove'")
+	}
+
+	if err := cli.CheckRemovedSafetyFlags(os.Args); err != nil {
+		return err
 	}
 
 	var publicKey *rsa.PublicKey

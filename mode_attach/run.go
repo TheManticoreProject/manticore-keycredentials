@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
+	"os"
 
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
@@ -31,7 +32,7 @@ import (
 // Parameters:
 //
 //	targets (cli.TargetOptions): The target selection flags.
-//	safety (cli.SafetyOptions): The dry-run and confirmation flags.
+//	safety (cli.SafetyOptions): The confirmation flag.
 //	pfxCertificate (string): Path to a PFX file holding the certificate to attach.
 //	pfxPassword (string): Password of the PFX file.
 //	pemFile (string): Path to a PEM file holding the certificate to attach.
@@ -47,6 +48,10 @@ import (
 func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pfxPassword, pemFile, identifier, creationTime, lastLogonTime, deviceId string, config config.Config) error {
 	if config.Debug {
 		logger.Debug("Starting mode 'attach'")
+	}
+
+	if err := cli.CheckRemovedSafetyFlags(os.Args); err != nil {
+		return err
 	}
 
 	var publicKey *rsa.PublicKey

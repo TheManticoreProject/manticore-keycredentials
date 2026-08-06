@@ -3,6 +3,7 @@ package mode_enroll
 import (
 	"encoding/base64"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -36,7 +37,7 @@ const EnrollOutputBaseDir = "./keys"
 // Parameters:
 //
 //	targets (cli.TargetOptions): The target selection flags.
-//	safety (cli.SafetyOptions): The dry-run and confirmation flags.
+//	safety (cli.SafetyOptions): The confirmation flag.
 //	identifier (string): The identifier of the KeyCredential, per-object random when empty.
 //	creationTime (string): The creation time of the KeyCredential.
 //	lastLogonTime (string): The last logon time of the KeyCredential.
@@ -54,6 +55,10 @@ const EnrollOutputBaseDir = "./keys"
 func Run(targets cli.TargetOptions, safety cli.SafetyOptions, identifier, creationTime, lastLogonTime, notBefore, notAfter, deviceId string, keySize int, exportPem, exportPfx bool, config config.Config) error {
 	if config.Debug {
 		logger.Debug("Starting mode 'enroll'")
+	}
+
+	if err := cli.CheckRemovedSafetyFlags(os.Args); err != nil {
+		return err
 	}
 
 	// Validate everything that does not depend on a target before connecting.

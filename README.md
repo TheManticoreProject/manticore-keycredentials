@@ -171,7 +171,8 @@ holding a `msDS-KeyCredentialLink` when none is given.
 
 The write modes (`enroll`, `attach`, `remove`) guard bulk changes:
 
-- `--dry-run` resolves the targets and prints what would happen without writing.
+- Every run prints the objects it resolved, and what it will do to them, before
+  touching the directory.
 - Acting on more than one object prompts for confirmation; `-y, --yes` skips the
   prompt for unattended use. A closed or non-interactive stdin counts as "no", so
   an unattended run cannot mass-modify by default.
@@ -275,7 +276,7 @@ The mode and flag layout was reworked. If you used an earlier build, the mapping
 | `--aes-key` (was refused) | `--aes-key` (now used for Kerberos authentication) |
 | `attach --private-key`/`--public-key`/`--pfx-certificate` | `attach --pem`/`--pfx` |
 | single `-D` on `enroll`/`attach`/`list`/`remove` | `-D` / `-f, --filter` / `-tf, --targets-file` |
-| — | `--dry-run` and `-y, --yes` on `enroll`/`attach`/`remove` |
+| — | `-y, --yes` on `enroll`/`attach`/`remove` |
 
 ## Demonstration
 
