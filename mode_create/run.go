@@ -76,7 +76,13 @@ func Run(subject, notBefore, notAfter string, keySize int, outputDir, pfxPasswor
 
 	datePrefix := time.Now().Format("2006-01-02_15-04-05")
 	baseName := utils.PathSafeString(subject)
-	dir := filepath.Join(outputDir, datePrefix)
+	// Reserve the directory rather than just naming it: the timestamp has one-second
+	// resolution, so a concurrent or immediately repeated run would otherwise share it
+	// and overwrite this run's private key.
+	dir, err := certificate.ReserveOutputDir(outputDir, datePrefix)
+	if err != nil {
+		return err
+	}
 
 	filePrivateKey := filepath.Join(dir, baseName+".pem")
 	fileCertificate := filepath.Join(dir, baseName+".cert.pem")
