@@ -57,20 +57,22 @@ Usage: manticore-keycredentials <attach|create|describe|enroll|extract|find|flus
 
 Every mode that talks to the directory shares the same `Configuration`,
 `LDAP Connection Settings`, `Authentication` and `Secret` groups. Exactly one of
-the `Secret` options (`-p`, `-H`, `--aes-key`, `--ticket-ccache`,
-`--ticket-kirbi`, or `--no-pass`) has to be given:
+the `Secret` options (`-p`, `-H`, `--aes-key`, `--ticket-ccache` or
+`--ticket-kirbi`) has to be given. `--no-pass` is not a secret of its own: it
+states that no password is coming and is passed alongside a ticket:
 
 ```
 $ ./manticore-keycredentials describe -h
 manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.0.0
 
-Usage: manticore-keycredentials describe --distinguished-name <string> [--domain <string>] [--username <string>] [--debug] [--dc-ip <string>] [--dc-host <string>] [--ldap-port <tcp port>] [--use-ldaps] [--use-kerberos] [--dns-name-server <string>] [--no-pass] [--password <string>] [--hashes <string>] [--aes-key <string>] [--ticket-ccache <string>] [--ticket-kirbi <string>]
+Usage: manticore-keycredentials describe --distinguished-name <string> [--domain <string>] [--username <string>] [--no-pass] [--debug] [--dc-ip <string>] [--dc-host <string>] [--ldap-port <tcp port>] [--use-ldaps] [--use-kerberos] [--dns-name-server <string>] [--password <string>] [--hashes <string>] [--aes-key <string>] [--ticket-ccache <string>] [--ticket-kirbi <string>]
 
   -D, --distinguished-name <string> Distinguished name of the target account.
 
   Authentication:
     -d, --domain <string>   Active Directory domain to authenticate to. (default: "")
     -u, --username <string> User to authenticate as. (default: "")
+    --no-pass               Don't ask for password, the secret is a Kerberos ticket (--ticket-ccache or --ticket-kirbi). (default: false)
 
   Configuration:
     --debug         Debug mode. (default: false)
@@ -84,7 +86,6 @@ Usage: manticore-keycredentials describe --distinguished-name <string> [--domain
     --dns-name-server <string>  DNS name server to use. (default: "")
 
   Secret:
-    --no-pass                 Don't ask for password (useful for -k). (default: false)
     -p, --password <string>   Password to authenticate with. (default: "")
     -H, --hashes <string>     NT/LM hashes, format is LMhash:NThash. (default: "")
     --aes-key <string>        AES key to use for Kerberos Authentication (128 or 256 bits). (default: "")

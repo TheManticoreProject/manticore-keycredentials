@@ -27,6 +27,6 @@ func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *
 
 	// Shared groups
 	cli.RegisterLDAPConnectionSettingsGroup(subparser_extract, domainController, dcHost, ldapPort, useLdaps, useKerberos, dnsNameServer)
-	cli.RegisterAuthenticationGroup(subparser_extract, authDomain, authUsername)
-	cli.RegisterSecretGroup(subparser_extract, authNoPass, authPassword, authHashes, authAesKey, ticketCCache, ticketKirbi)
+	cli.RegisterAuthenticationGroup(subparser_extract, authDomain, authUsername, authNoPass)
+	cli.RegisterSecretGroup(subparser_extract, authPassword, authHashes, authAesKey, ticketCCache, ticketKirbi)
 }
