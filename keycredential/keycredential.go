@@ -7,6 +7,7 @@ package keycredential
 import (
 	"crypto/rsa"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -49,6 +50,32 @@ func BCryptPublicKeyFromRSA(publicKey *rsa.PublicKey) *keys.BCRYPT_RSA_PUBLIC_KE
 			Modulus:        modulusBytes,
 		},
 	}
+}
+
+// KeyIDForKeyMaterial returns the KeyID a msDS-KeyCredentialLink entry has to carry
+// for the given key material.
+//
+// MS-ADTS 2.2.20 defines the KeyID entry as the SHA-256 hash of the KeyMaterial
+// entry's value. The KDC matches the public key presented during a PKINIT exchange
+// against that hash to find the credential, so a KeyID derived from anything else
+// leaves the credential unmatched and the account unusable for authentication.
+//
+// Parameters:
+//
+//	keyMaterial (*keys.BCRYPT_RSA_PUBLIC_KEY): The key material the entry will carry.
+//
+// Returns:
+//
+//	The base64-encoded KeyID, or an error if the key material cannot be marshalled.
+func KeyIDForKeyMaterial(keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY) (string, error) {
+	rawKeyMaterial, err := keyMaterial.Marshal()
+	if err != nil {
+		return "", fmt.Errorf("error marshalling key material: %s", err)
+	}
+
+	sum := sha256.Sum256(rawKeyMaterial)
+
+	return base64.StdEncoding.EncodeToString(sum[:]), nil
 }
 
 // ShortFingerprint condenses a full key fingerprint into a short, stable hex digest
