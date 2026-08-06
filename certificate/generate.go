@@ -24,6 +24,11 @@ const (
 // notAfter defaults to DefaultValidityDays past notBefore, so a caller only has to
 // supply the parts it cares about.
 //
+// A notAfter at or before notBefore describes a window in which the certificate is
+// never valid, which is rejected rather than passed on: the certificate would be
+// generated and, for enroll, attached to a target object, only to be refused
+// wherever it is used.
+//
 // Parameters:
 //
 //	notBefore (string): The start of the validity window, or empty for now.
@@ -31,7 +36,8 @@ const (
 //
 // Returns:
 //
-//	The notBefore and notAfter times, or an error if either string is malformed.
+//	The notBefore and notAfter times, or an error if either string is malformed or
+//	the window is empty.
 func ParseValidityWindow(notBefore, notAfter string) (time.Time, time.Time, error) {
 	notBeforeTime, err := utils.TimeStringToTime(notBefore)
 	if err != nil {
@@ -45,6 +51,13 @@ func ParseValidityWindow(notBefore, notAfter string) (time.Time, time.Time, erro
 			return time.Time{}, time.Time{}, fmt.Errorf("error parsing notAfter: %s", err)
 		}
 		notAfterTime = *notAfterTimePtr
+	}
+
+	if !notAfterTime.After(*notBeforeTime) {
+		return time.Time{}, time.Time{}, fmt.Errorf(
+			"notAfter (%s) has to be after notBefore (%s), otherwise the certificate is never valid",
+			notAfterTime.Format(time.RFC3339), notBeforeTime.Format(time.RFC3339),
+		)
 	}
 
 	return *notBeforeTime, notAfterTime, nil
