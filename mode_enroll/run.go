@@ -3,6 +3,7 @@ package mode_enroll
 import (
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/TheManticoreProject/Manticore/logger"
@@ -20,6 +21,10 @@ import (
 	"github.com/TheManticoreProject/manticore-keycredentials/keycredential"
 	kcl_utils "github.com/TheManticoreProject/manticore-keycredentials/utils"
 )
+
+// EnrollOutputBaseDir is the directory enroll writes its per-run export directories
+// into. Unlike create, enroll takes no output directory option.
+const EnrollOutputBaseDir = "./keys"
 
 // Run creates a new certificate for each target object and attaches it as a
 // KeyCredentialLink.
@@ -129,13 +134,24 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, identifier, creati
 		return nil
 	}
 
-	datePrefix := time.Now().Format("2006-01-02_15-04-05")
+	// Reserve one output directory for the whole run, before anything is written to
+	// the directory. The timestamp has one-second resolution, so without reserving it
+	// a concurrent or immediately repeated run would share it and overwrite this run's
+	// exported private keys, leaving the credentials it just planted unusable.
+	//
+	// Run has already refused an invocation that exports nothing, so there is always
+	// something to write here.
+	exportDir, err := certificate.ReserveOutputDir(EnrollOutputBaseDir, time.Now().Format("2006-01-02_15-04-05"))
+	if err != nil {
+		return err
+	}
+
 	failures := 0
 	for _, entry := range entries {
 		dn := entry.GetAttributeValue("distinguishedName")
 		sAMAccountName := entry.GetAttributeValue("sAMAccountName")
 
-		if err := enrollOne(ldapSession, dn, sAMAccountName, identifier, deviceId, keySize, notBeforeTime, notAfterTime, creationDateTime, lastLogonDateTime, exportPem, exportPfx, datePrefix, config); err != nil {
+		if err := enrollOne(ldapSession, dn, sAMAccountName, identifier, deviceId, keySize, notBeforeTime, notAfterTime, creationDateTime, lastLogonDateTime, exportPem, exportPfx, exportDir, config); err != nil {
 			failures++
 			logger.Warn(fmt.Sprintf("%s: %s", dn, err))
 			continue
@@ -150,8 +166,8 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, identifier, creati
 }
 
 // enrollOne generates a certificate for a single object, attaches it, and exports
-// it.
-func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, deviceId string, keySize int, notBeforeTime, notAfterTime time.Time, creationDateTime, lastLogonDateTime keycredential_utils.DateTime, exportPem, exportPfx bool, datePrefix string, config config.Config) error {
+// it into exportDir, the directory reserved for this run.
+func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, deviceId string, keySize int, notBeforeTime, notAfterTime time.Time, creationDateTime, lastLogonDateTime keycredential_utils.DateTime, exportPem, exportPfx bool, exportDir string, config config.Config) error {
 	cert, err := certificate.Generate(sAMAccountName, keySize, notBeforeTime, notAfterTime)
 	if err != nil {
 		return err
@@ -202,8 +218,8 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 	}
 
 	if exportPem {
-		filePrivateKey := fmt.Sprintf("./keys/%s/%s.pem", datePrefix, baseName)
-		fileCertificatePem := fmt.Sprintf("./keys/%s/%s.cert.pem", datePrefix, baseName)
+		filePrivateKey := filepath.Join(exportDir, baseName+".pem")
+		fileCertificatePem := filepath.Join(exportDir, baseName+".cert.pem")
 		if err := cert.ExportRSAPrivateKeyPEM(filePrivateKey); err != nil {
 			return fmt.Errorf("error exporting PEM private key: %s", err)
 		}
@@ -215,7 +231,7 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 	}
 	if exportPfx {
 		pfxPassword := utils.RandomString(16)
-		fileCertificatePFX := fmt.Sprintf("./keys/%s/%s_%s.pfx", datePrefix, baseName, pfxPassword)
+		fileCertificatePFX := filepath.Join(exportDir, fmt.Sprintf("%s_%s.pfx", baseName, pfxPassword))
 		if err := cert.ExportPFX(fileCertificatePFX, pfxPassword); err != nil {
 			return fmt.Errorf("error exporting PFX certificate: %s", err)
 		}
