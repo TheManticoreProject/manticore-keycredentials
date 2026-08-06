@@ -75,7 +75,7 @@ var (
 )
 
 func parseArgs() {
-	ap := parser.ArgumentsParser{Banner: "manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.0.0"}
+	ap := parser.ArgumentsParser{Banner: "manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.1.0"}
 	ap.SetOptShowBannerOnHelp(true)
 	ap.SetOptShowBannerOnRun(true)
 	ap.SetupSubParsing("mode", &mode, true)
