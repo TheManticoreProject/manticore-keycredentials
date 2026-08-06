@@ -134,11 +134,16 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 		return nil
 	}
 
+	// One version value feeds both the KeyID derivation and the credential itself, so
+	// the identifier encoding cannot drift from the version it is written under. The
+	// key material is the same for every target, so the derived KeyID is too.
+	kcVersion := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
+
 	failures := 0
 	for _, entry := range entries {
 		dn := entry.GetAttributeValue("distinguishedName")
 
-		perObjectIdentifier, err := resolveIdentifier(identifier, keyMaterial)
+		perObjectIdentifier, err := resolveIdentifier(identifier, keyMaterial, kcVersion)
 		if err != nil {
 			failures++
 			logger.Warn(fmt.Sprintf("%s: %s", dn, err))
@@ -150,7 +155,7 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 		}
 
 		kc := keycredentiallink.NewKeyCredentialLink(
-			version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
+			kcVersion,
 			perObjectIdentifier,
 			keyMaterial,
 			perObjectDeviceId,
@@ -192,11 +197,11 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 // Returns:
 //
 //	The identifier to use, or an error if the KeyID cannot be derived.
-func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY) (string, error) {
+func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY, kcVersion version.KeyCredentialLinkVersion) (string, error) {
 	if len(identifier) > 0 {
 		return identifier, nil
 	}
-	return keycredential.KeyIDForKeyMaterial(keyMaterial)
+	return keycredential.KeyIDForKeyMaterial(keyMaterial, kcVersion)
 }
 
 // parseTimeOrNow parses an option time string, defaulting to now when it is empty.

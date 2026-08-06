@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"math/big"
 	"os"
@@ -216,18 +217,33 @@ func TestKeyIDForKeyMaterialIsSHA256OfKeyMaterial(t *testing.T) {
 	key, _ := testKey(t, "VICTIM$")
 	keyMaterial := keycredential.BCryptPublicKeyFromRSA(&key.PublicKey)
 
-	keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial)
-	if err != nil {
-		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
-	}
-
 	rawKeyMaterial, err := keyMaterial.Marshal()
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
 	}
 	sum := sha256.Sum256(rawKeyMaterial)
-	if want := base64.StdEncoding.EncodeToString(sum[:]); keyID != want {
-		t.Errorf("KeyIDForKeyMaterial() = %s, want %s", keyID, want)
+
+	// The encoding of the hash is version-dependent: hex for v0 and v1, base64 for v2.
+	tests := []struct {
+		name    string
+		version version.KeyCredentialLinkVersion
+		want    string
+	}{
+		{name: "v2 is base64", version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}, want: base64.StdEncoding.EncodeToString(sum[:])},
+		{name: "v1 is hex", version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_1}, want: hex.EncodeToString(sum[:])},
+		{name: "v0 is hex", version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_0}, want: hex.EncodeToString(sum[:])},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial, tt.version)
+			if err != nil {
+				t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
+			}
+			if keyID != tt.want {
+				t.Errorf("KeyIDForKeyMaterial() = %s, want %s", keyID, tt.want)
+			}
+		})
 	}
 }
 
@@ -238,14 +254,15 @@ func TestBuiltCredentialCarriesDerivedKeyID(t *testing.T) {
 	key, _ := testKey(t, "VICTIM$")
 	keyMaterial := keycredential.BCryptPublicKeyFromRSA(&key.PublicKey)
 
-	keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial)
+	kcVersion := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
+	keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial, kcVersion)
 	if err != nil {
 		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
 	}
 
 	now := keycredential_utils.NewDateTimeFromTime(time.Now())
 	kc := keycredentiallink.NewKeyCredentialLink(
-		version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
+		kcVersion,
 		keyID,
 		keyMaterial,
 		guid.NewGUID(),
@@ -267,7 +284,7 @@ func TestBuiltCredentialCarriesDerivedKeyID(t *testing.T) {
 	if !ok {
 		t.Fatal("RSAKeyMaterial() ok = false")
 	}
-	want, err := keycredential.KeyIDForKeyMaterial(parsedKeyMaterial)
+	want, err := keycredential.KeyIDForKeyMaterial(parsedKeyMaterial, kcVersion)
 	if err != nil {
 		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
 	}

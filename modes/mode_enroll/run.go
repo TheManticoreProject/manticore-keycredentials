@@ -183,7 +183,11 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 		return fmt.Errorf("error exporting RSA public key: %s", err)
 	}
 
-	credentialIdentifier, err := resolveIdentifier(identifier, bcryptRsaPublicKey)
+	// One version value feeds both the KeyID derivation and the credential itself, so
+	// the identifier encoding cannot drift from the version it is written under.
+	kcVersion := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
+
+	credentialIdentifier, err := resolveIdentifier(identifier, bcryptRsaPublicKey, kcVersion)
 	if err != nil {
 		return err
 	}
@@ -194,7 +198,7 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 
 	// NewKeyCredentialLink takes lastLogonTime before creationTime.
 	kc := keycredentiallink.NewKeyCredentialLink(
-		version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
+		kcVersion,
 		credentialIdentifier,
 		bcryptRsaPublicKey,
 		deviceIdGUID,
@@ -249,11 +253,11 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 
 // resolveIdentifier returns the explicit identifier when one was given, or the
 // KeyID the key material requires.
-func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY) (string, error) {
+func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY, kcVersion version.KeyCredentialLinkVersion) (string, error) {
 	if len(identifier) > 0 {
 		return identifier, nil
 	}
-	return keycredential.KeyIDForKeyMaterial(keyMaterial)
+	return keycredential.KeyIDForKeyMaterial(keyMaterial, kcVersion)
 }
 
 // parseTimeOrDefault parses an option time string, defaulting to the given time
