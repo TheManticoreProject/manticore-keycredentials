@@ -97,7 +97,8 @@ func Run(subject, notBefore, notAfter string, keySize int, outputDir, pfxPasswor
 	logger.Print(fmt.Sprintf("  ├── Certificate (PEM): \x1b[94m%s\x1b[0m", fileCertificate))
 	logger.Print(fmt.Sprintf("  └── PFX (password '\x1b[93m%s\x1b[0m'): \x1b[94m%s\x1b[0m", pfxPassword, filePFX))
 	logger.Print("")
-	logger.Info("Attach it to a target object with 'enroll --pfx <file>' once that mode supports an existing certificate.")
+	logger.Info("Attach it to a target object with 'attach', which takes an existing certificate:")
+	logger.Info(fmt.Sprintf("   manticore-keycredentials attach --pfx '%s' --pfx-password '%s' -D '<target DN>' -dc <dc-ip> -d <domain> -u <user> -p <password>", filePFX, pfxPassword))
 
 	return nil
 }
