@@ -40,7 +40,7 @@ no mode prints the list of available modes:
 
 ```
 $ ./manticore-keycredentials
-manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.0.0
+manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.1.0
 
 Usage: manticore-keycredentials <attach|create|describe|enroll|extract|find|flush|list|remove>
 
@@ -63,7 +63,7 @@ states that no password is coming and is passed alongside a ticket:
 
 ```
 $ ./manticore-keycredentials describe -h
-manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.0.0
+manticore-keycredentials - by Remi GASCOU (Podalirius) @ TheManticoreProject - v1.1.0
 
 Usage: manticore-keycredentials describe --distinguished-name <string> [--domain <string>] [--username <string>] [--no-pass] [--debug] [--dc-ip <string>] [--dc-host <string>] [--ldap-port <tcp port>] [--use-ldaps] [--use-kerberos] [--dns-name-server <string>] [--password <string>] [--hashes <string>] [--aes-key <string>] [--ticket-ccache <string>] [--ticket-kirbi <string>]
 
