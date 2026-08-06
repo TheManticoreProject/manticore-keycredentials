@@ -52,6 +52,13 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, identifier, creati
 	}
 
 	// Validate everything that does not depend on a target before connecting.
+	//
+	// enroll generates the only copy of the private key, so a run that exports nothing
+	// plants a credential nobody can use. Require at least one export format, while
+	// allowing both.
+	if !exportPem && !exportPfx {
+		return fmt.Errorf("no export format selected: set --export-pem, --export-pfx, or both, otherwise the generated private key is lost")
+	}
 	notBeforeTime, notAfterTime, err := certificate.ParseValidityWindow(notBefore, notAfter)
 	if err != nil {
 		return err

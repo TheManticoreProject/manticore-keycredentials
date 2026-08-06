@@ -28,12 +28,18 @@ func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, targets *cli.Target
 		subparser_enroll_group_keycredential.NewStringArgument(deviceId, "", "--device-id", "", false, "Device ID of the KeyCredential. A fresh one is generated per object when omitted.")
 	}
 	// Export certificate
-	subparser_enroll_group_export, err := subparser_enroll.NewRequiredMutuallyExclusiveArgumentGroup("Export certificate")
+	//
+	// PEM and PFX are separate artifacts here, not two encodings of one output, so the
+	// group is not mutually exclusive: both can be asked for in a single run. At least
+	// one is still required, since enroll generates the only copy of the private key
+	// and exporting nothing would discard it. That is checked in Run, because goopts
+	// has no "at least one of, not exclusive" group.
+	subparser_enroll_group_export, err := subparser_enroll.NewArgumentGroup("Export certificate")
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error creating ArgumentGroup: %s", err))
 	} else {
-		subparser_enroll_group_export.NewBoolArgument(exportPem, "", "--export-pem", false, "Export the certificate in PEM format.")
-		subparser_enroll_group_export.NewBoolArgument(exportPfx, "", "--export-pfx", false, "Export the certificate in PFX format.")
+		subparser_enroll_group_export.NewBoolArgument(exportPem, "", "--export-pem", false, "Export the certificate in PEM format. Can be combined with --export-pfx.")
+		subparser_enroll_group_export.NewBoolArgument(exportPfx, "", "--export-pfx", false, "Export the certificate in PFX format. Can be combined with --export-pem.")
 	}
 
 	// Targets and safety
