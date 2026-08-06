@@ -279,7 +279,112 @@ The mode and flag layout was reworked. If you used an earlier build, the mapping
 
 ## Demonstration
 
-<!-- TODO: Add a demonstration -->
+Detecting a **reused key credential**: the same key planted on several objects. This
+is the reverse Shadow Credentials problem — a single certificate (legitimate or
+malicious) set on more than one principal — and `find` locates every object it was
+planted on, even though each object's raw attribute value differs.
+
+### 1. Create one certificate
+
+`create` generates a keypair locally and never touches the directory:
+
+```
+$ manticore-keycredentials create --subject shared-key --pfx-password 'hunter2'
+[>] Created a new certificate for shared-key:
+  ├── Private key (PEM): keys/.../shared-key.pem
+  ├── Certificate (PEM): keys/.../shared-key.cert.pem
+  └── PFX (password 'hunter2'): keys/.../shared-key_hunter2.pfx
+```
+
+### 2. Attach that same certificate to two objects
+
+`attach` sets the caller's certificate on each target. Attaching one certificate to
+two objects is the reuse: each object gets its own `KeyID`, `DeviceId`, `KeyHash` and
+timestamps, but they share the same key material.
+
+```
+$ manticore-keycredentials attach -L -d MANTICORE.local -u operator -p 'Passw0rd!' -dc 192.168.1.10 \
+      --pfx keys/.../shared-key_hunter2.pfx --pfx-password 'hunter2' \
+      -D 'CN=Administrator,CN=Users,DC=MANTICORE,DC=local'
+[>] Attaching the certificate (fingerprint f329b79a7e1c2a2c) to (1):
+  └── CN=Administrator,CN=Users,DC=MANTICORE,DC=local
+INFO: Attached the certificate to 'CN=Administrator,CN=Users,DC=MANTICORE,DC=local'
+
+$ manticore-keycredentials attach -L -d MANTICORE.local -u operator -p 'Passw0rd!' -dc 192.168.1.10 \
+      --pfx keys/.../shared-key_hunter2.pfx --pfx-password 'hunter2' \
+      -D 'CN=Guest,CN=Users,DC=MANTICORE,DC=local'
+[>] Attaching the certificate (fingerprint f329b79a7e1c2a2c) to (1):
+  └── CN=Guest,CN=Users,DC=MANTICORE,DC=local
+INFO: Attached the certificate to 'CN=Guest,CN=Users,DC=MANTICORE,DC=local'
+```
+
+`list` shows why byte-for-byte comparison misses this. The two values differ at the
+front (`KeyID`) and the end (`DeviceId`, timestamps), while the key material in the
+middle is identical:
+
+```
+$ manticore-keycredentials list -L -d MANTICORE.local -u operator -p 'Passw0rd!' -dc 192.168.1.10
+[>] Objects with a msDS-KeyCredentialLink (2):
+  ├── CN=Administrator,CN=Users,DC=MANTICORE,DC=local
+  │   └── B:828:0002...56A07C4A...0103525341310008...010001E012E84AC23F6B...:CN=Administrator,...
+  └── CN=Guest,CN=Users,DC=MANTICORE,DC=local
+      └── B:828:0002...CB16F4ED...0103525341310008...010001E012E84AC23F6B...:CN=Guest,...
+                        ^^^^^^^^ different KeyID     ^^^^^^^^^^^^^^^^^^^^^^ identical key material
+```
+
+`describe` confirms every metadata field a naive comparison keys on is different,
+even though the underlying key is the same:
+
+```
+$ manticore-keycredentials describe -L -d MANTICORE.local -u operator -p 'Passw0rd!' -dc 192.168.1.10 \
+      -D 'CN=Administrator,CN=Users,DC=MANTICORE,DC=local'
+[>] KeyCredentialLink values of CN=Administrator,CN=Users,DC=MANTICORE,DC=local (1):
+  └── [1] KeyID: VqB8Spcc9TJ73KRt3K3EdwrbXdZPwxnGCiy/9HIbiFo=
+      ├── KeyHash: dab147b9...156f (valid)
+      ├── DeviceId: d0215aed-0cdf-270d-cd8c-0f94ef5547fc
+      └── CreationTime (UTC): 2026-08-03 15:31:24
+```
+
+### 3. Find every object the key is set on
+
+`find` fingerprints the key material and reports every object that carries it,
+regardless of the surrounding metadata. A certificate, private key or public key are
+all usable inputs, so a public certificate is enough:
+
+```
+$ manticore-keycredentials find -L -d MANTICORE.local -u operator -p 'Passw0rd!' -dc 192.168.1.10 \
+      --pem keys/.../shared-key.cert.pem --debug
+DEBUG: Searching for key fingerprint: BCRYPT_RSA_PUBLIC_KEY:0x010001:0xe012e84a...e1bcd25
+DEBUG: Compared 2 key credentials, skipped 0
+[>] Objects with this key credential (2):
+  ├── CN=Administrator,CN=Users,DC=MANTICORE,DC=local
+  │   ├── DeviceId: d0215aed-0cdf-270d-cd8c-0f94ef5547fc
+  │   └── CreationTime (UTC): 2026-08-03 15:31:24
+  └── CN=Guest,CN=Users,DC=MANTICORE,DC=local
+      ├── DeviceId: a3fe6514-95fa-2b67-fa78-5f09459b61b2
+      └── CreationTime (UTC): 2026-08-03 15:15:07
+```
+
+Both objects are reported despite their byte-different attribute values: the match is
+on the key, not on the blob. This is the reverse lookup that answers "where else is
+this credential planted?", and it pairs with
+[FindReusedKeyCredentials](https://github.com/TheManticoreProject/FindReusedKeyCredentials),
+which finds keys shared between objects without needing the key up front.
+
+### 4. Clean up
+
+`remove` deletes just the matching credential from an object, leaving any other
+credentials in place; `flush` clears the whole `msDS-KeyCredentialLink` attribute of
+an object:
+
+```
+$ manticore-keycredentials remove -L -d MANTICORE.local -u operator -p 'Passw0rd!' -dc 192.168.1.10 \
+      --pfx keys/.../shared-key_hunter2.pfx --pfx-password 'hunter2' \
+      -D 'CN=Administrator,CN=Users,DC=MANTICORE,DC=local'
+[>] Objects the certificate would be removed from (1 of 1 resolved):
+  └── CN=Administrator,CN=Users,DC=MANTICORE,DC=local (1 to remove, 0 kept)
+INFO: Removed 1 value(s) from 'CN=Administrator,CN=Users,DC=MANTICORE,DC=local'
+```
 
 ## Contributing
 
