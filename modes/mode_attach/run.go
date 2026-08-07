@@ -9,7 +9,6 @@ import (
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/utils"
-	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys"
 	"github.com/TheManticoreProject/Manticore/windows/guid"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink"
 	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
@@ -134,29 +133,22 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 		return nil
 	}
 
-	// One version value feeds both the KeyID derivation and the credential itself, so
-	// the identifier encoding cannot drift from the version it is written under. The
-	// key material is the same for every target, so the derived KeyID is too.
-	kcVersion := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
-
 	failures := 0
 	for _, entry := range entries {
 		dn := entry.GetAttributeValue("distinguishedName")
 
-		perObjectIdentifier, err := resolveIdentifier(identifier, keyMaterial, kcVersion)
-		if err != nil {
-			failures++
-			logger.Warn(fmt.Sprintf("%s: %s", dn, err))
-			continue
-		}
 		perObjectDeviceId := guid.NewGUID()
 		if len(deviceId) > 0 {
 			perObjectDeviceId, _ = guid.FromString(deviceId)
 		}
 
+		// An empty identifier is derived by NewKeyCredentialLink as the SHA-256 of the
+		// key material, which is what MS-ADTS 2.2.20 requires, so only an explicit
+		// --identifier is passed through here. Every target shares the key material, so
+		// the derived KeyID is the same on each.
 		kc := keycredentiallink.NewKeyCredentialLink(
-			kcVersion,
-			perObjectIdentifier,
+			version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
+			identifier,
 			keyMaterial,
 			perObjectDeviceId,
 			&lastLogonDateTime,
@@ -184,24 +176,6 @@ func Run(targets cli.TargetOptions, safety cli.SafetyOptions, pfxCertificate, pf
 	}
 
 	return nil
-}
-
-// resolveIdentifier returns the explicit identifier when one was given, or the
-// KeyID the key material requires.
-//
-// Parameters:
-//
-//	identifier (string): The explicit identifier, or empty to derive it.
-//	keyMaterial (*keys.BCRYPT_RSA_PUBLIC_KEY): The key material of the credential.
-//
-// Returns:
-//
-//	The identifier to use, or an error if the KeyID cannot be derived.
-func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY, kcVersion version.KeyCredentialLinkVersion) (string, error) {
-	if len(identifier) > 0 {
-		return identifier, nil
-	}
-	return keycredential.KeyIDForKeyMaterial(keyMaterial, kcVersion)
 }
 
 // parseTimeOrNow parses an option time string, defaulting to now when it is empty.

@@ -210,10 +210,16 @@ func TestBuiltCredentialIsFindable(t *testing.T) {
 	}
 }
 
-// TestKeyIDForKeyMaterialIsSHA256OfKeyMaterial pins the KeyID to the definition in
-// MS-ADTS 2.2.20. The KDC looks a PKINIT key up by this hash, so a KeyID derived from
-// anything else silently produces a credential that cannot authenticate.
-func TestKeyIDForKeyMaterialIsSHA256OfKeyMaterial(t *testing.T) {
+// TestBuiltCredentialCarriesDerivedKeyID walks the write path enroll and attach use:
+// hand NewKeyCredentialLink an empty identifier, marshal the credential to the
+// attribute value, parse it back, and check the KeyID that landed in the blob is the
+// SHA-256 of the key material, encoded as the version requires.
+//
+// The derivation itself now lives in the library. This stays here as the guard that a
+// library bump cannot silently take it away again: the KDC looks a PKINIT key up by
+// this hash, so a credential carrying anything else is unusable, and nothing else in
+// this repository would notice.
+func TestBuiltCredentialCarriesDerivedKeyID(t *testing.T) {
 	key, _ := testKey(t, "VICTIM$")
 	keyMaterial := keycredential.BCryptPublicKeyFromRSA(&key.PublicKey)
 
@@ -223,7 +229,8 @@ func TestKeyIDForKeyMaterialIsSHA256OfKeyMaterial(t *testing.T) {
 	}
 	sum := sha256.Sum256(rawKeyMaterial)
 
-	// The encoding of the hash is version-dependent: hex for v0 and v1, base64 for v2.
+	// Computed here rather than through the library, so this asserts the spec rather
+	// than asserting the library against itself.
 	tests := []struct {
 		name    string
 		version version.KeyCredentialLinkVersion
@@ -236,39 +243,49 @@ func TestKeyIDForKeyMaterialIsSHA256OfKeyMaterial(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial, tt.version)
+			now := keycredential_utils.NewDateTimeFromTime(time.Now())
+			kc := keycredentiallink.NewKeyCredentialLink(
+				tt.version,
+				"", // the library derives it
+				keyMaterial,
+				guid.NewGUID(),
+				&now,
+				&now,
+			)
+
+			rawBytes, err := kc.Marshal()
 			if err != nil {
-				t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
+				t.Fatalf("Marshal() error = %v", err)
 			}
-			if keyID != tt.want {
-				t.Errorf("KeyIDForKeyMaterial() = %s, want %s", keyID, tt.want)
+			dnWithBinary := ldap.DNWithBinary{DistinguishedName: "CN=VICTIM,DC=x", BinaryData: rawBytes}
+
+			parsed, err := keycredential.ParseValue([]byte(dnWithBinary.String()))
+			if err != nil {
+				t.Fatalf("ParseValue() error = %v", err)
+			}
+			if parsed.Identifier != tt.want {
+				t.Errorf("stored KeyID = %s, want the SHA-256 of the key material %s", parsed.Identifier, tt.want)
 			}
 		})
 	}
 }
 
-// TestBuiltCredentialCarriesDerivedKeyID walks the whole write path: build the
-// credential the way enroll and attach do, marshal it to the attribute value, parse it
-// back, and check the KeyID that landed in the blob is the hash of the key material.
-func TestBuiltCredentialCarriesDerivedKeyID(t *testing.T) {
+// An explicit --identifier is a request to reproduce a specific credential, so it has
+// to reach the blob untouched rather than being replaced by the derived KeyID.
+func TestBuiltCredentialKeepsExplicitIdentifier(t *testing.T) {
+	const explicit = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+
 	key, _ := testKey(t, "VICTIM$")
-	keyMaterial := keycredential.BCryptPublicKeyFromRSA(&key.PublicKey)
-
-	kcVersion := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
-	keyID, err := keycredential.KeyIDForKeyMaterial(keyMaterial, kcVersion)
-	if err != nil {
-		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
-	}
-
 	now := keycredential_utils.NewDateTimeFromTime(time.Now())
 	kc := keycredentiallink.NewKeyCredentialLink(
-		kcVersion,
-		keyID,
-		keyMaterial,
+		version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
+		explicit,
+		keycredential.BCryptPublicKeyFromRSA(&key.PublicKey),
 		guid.NewGUID(),
 		&now,
 		&now,
 	)
+
 	rawBytes, err := kc.Marshal()
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
@@ -279,17 +296,8 @@ func TestBuiltCredentialCarriesDerivedKeyID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseValue() error = %v", err)
 	}
-
-	parsedKeyMaterial, ok := keycredential.RSAKeyMaterial(parsed)
-	if !ok {
-		t.Fatal("RSAKeyMaterial() ok = false")
-	}
-	want, err := keycredential.KeyIDForKeyMaterial(parsedKeyMaterial, kcVersion)
-	if err != nil {
-		t.Fatalf("KeyIDForKeyMaterial() error = %v", err)
-	}
-	if parsed.Identifier != want {
-		t.Errorf("stored KeyID = %s, want SHA256 of the stored key material %s", parsed.Identifier, want)
+	if parsed.Identifier != explicit {
+		t.Errorf("stored KeyID = %s, want the supplied %s", parsed.Identifier, explicit)
 	}
 }
 

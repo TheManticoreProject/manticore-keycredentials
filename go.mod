@@ -3,7 +3,7 @@ module github.com/TheManticoreProject/manticore-keycredentials
 go 1.24.0
 
 require (
-	github.com/TheManticoreProject/Manticore v1.1.6-0.20260803131759-7ccbf2ebead7
+	github.com/TheManticoreProject/Manticore v1.1.6-0.20260806152428-b207d92283f6
 	github.com/TheManticoreProject/goopts v1.2.4
 	github.com/go-ldap/ldap/v3 v3.4.12
 	software.sslmate.com/src/go-pkcs12 v0.7.3
