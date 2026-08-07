@@ -17,8 +17,6 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/magic"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink"
-	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
-	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 )
 
 // BCryptPublicKeyFromRSA wraps an RSA public key in the BCRYPT_RSA_PUBLIC_KEY
@@ -51,36 +49,6 @@ func BCryptPublicKeyFromRSA(publicKey *rsa.PublicKey) *keys.BCRYPT_RSA_PUBLIC_KE
 			Modulus:        modulusBytes,
 		},
 	}
-}
-
-// KeyIDForKeyMaterial returns the KeyID a msDS-KeyCredentialLink entry has to carry
-// for the given key material.
-//
-// MS-ADTS 2.2.20 defines the KeyID entry as the SHA-256 hash of the KeyMaterial
-// entry's value. The KDC matches the public key presented during a PKINIT exchange
-// against that hash to find the credential, so a KeyID derived from anything else
-// leaves the credential unmatched and the account unusable for authentication.
-//
-// The hashing and the version-dependent encoding are the library's
-// utils.ComputeKeyIdentifier; this only marshals the key material to the bytes that
-// go into the entry. The version has to be the one the credential is written with,
-// since it selects hex for v0 and v1 and base64 for v2.
-//
-// Parameters:
-//
-//	keyMaterial (*keys.BCRYPT_RSA_PUBLIC_KEY): The key material the entry will carry.
-//	kcVersion (version.KeyCredentialLinkVersion): The version of the credential.
-//
-// Returns:
-//
-//	The encoded KeyID, or an error if the key material cannot be marshalled.
-func KeyIDForKeyMaterial(keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY, kcVersion version.KeyCredentialLinkVersion) (string, error) {
-	rawKeyMaterial, err := keyMaterial.Marshal()
-	if err != nil {
-		return "", fmt.Errorf("error marshalling key material: %s", err)
-	}
-
-	return keycredential_utils.ComputeKeyIdentifier(rawKeyMaterial, kcVersion), nil
 }
 
 // ShortFingerprint condenses a full key fingerprint into a short, stable hex digest

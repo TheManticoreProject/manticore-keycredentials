@@ -10,7 +10,6 @@ import (
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/utils"
-	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys"
 	"github.com/TheManticoreProject/Manticore/windows/guid"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink"
 	keycredential_utils "github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
@@ -19,7 +18,6 @@ import (
 	"github.com/TheManticoreProject/manticore-keycredentials/certificate"
 	"github.com/TheManticoreProject/manticore-keycredentials/cli"
 	"github.com/TheManticoreProject/manticore-keycredentials/config"
-	"github.com/TheManticoreProject/manticore-keycredentials/keycredential"
 	kcl_utils "github.com/TheManticoreProject/manticore-keycredentials/utils"
 )
 
@@ -183,23 +181,18 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 		return fmt.Errorf("error exporting RSA public key: %s", err)
 	}
 
-	// One version value feeds both the KeyID derivation and the credential itself, so
-	// the identifier encoding cannot drift from the version it is written under.
-	kcVersion := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
-
-	credentialIdentifier, err := resolveIdentifier(identifier, bcryptRsaPublicKey, kcVersion)
-	if err != nil {
-		return err
-	}
 	deviceIdGUID := guid.NewGUID()
 	if len(deviceId) > 0 {
 		deviceIdGUID, _ = guid.FromString(deviceId)
 	}
 
 	// NewKeyCredentialLink takes lastLogonTime before creationTime.
+	// An empty identifier is derived by NewKeyCredentialLink as the SHA-256 of the key
+	// material, which is what MS-ADTS 2.2.20 requires, so only an explicit --identifier
+	// is passed through here.
 	kc := keycredentiallink.NewKeyCredentialLink(
-		kcVersion,
-		credentialIdentifier,
+		version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
+		identifier,
 		bcryptRsaPublicKey,
 		deviceIdGUID,
 		&lastLogonDateTime,
@@ -249,15 +242,6 @@ func enrollOne(ldapSession *ldap.Session, dn, sAMAccountName, identifier, device
 	}
 
 	return nil
-}
-
-// resolveIdentifier returns the explicit identifier when one was given, or the
-// KeyID the key material requires.
-func resolveIdentifier(identifier string, keyMaterial *keys.BCRYPT_RSA_PUBLIC_KEY, kcVersion version.KeyCredentialLinkVersion) (string, error) {
-	if len(identifier) > 0 {
-		return identifier, nil
-	}
-	return keycredential.KeyIDForKeyMaterial(keyMaterial, kcVersion)
 }
 
 // parseTimeOrDefault parses an option time string, defaulting to the given time
