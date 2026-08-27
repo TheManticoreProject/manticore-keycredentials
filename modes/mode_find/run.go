@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/TheManticoreProject/Manticore/logger"
+	ldapv3 "github.com/go-ldap/ldap/v3"
 
 	"github.com/TheManticoreProject/manticore-keycredentials/certificate"
 	"github.com/TheManticoreProject/manticore-keycredentials/config"
@@ -80,7 +81,8 @@ func Run(distinguishedName string, pfxCertificate string, pfxPassword string, pe
 	// attribute presence filter is kept even when a single object is targeted.
 	query := "(msDS-KeyCredentialLink=*)"
 	if len(distinguishedName) > 0 {
-		query = fmt.Sprintf("(&(distinguishedName=%s)(msDS-KeyCredentialLink=*))", distinguishedName)
+		safeDN := ldapv3.EscapeFilter(distinguishedName)
+		query = fmt.Sprintf("(&(distinguishedName=%s)(msDS-KeyCredentialLink=*))", safeDN)
 	}
 	if config.Debug {
 		logger.Debug(fmt.Sprintf("Querying ldap: %s", query))
