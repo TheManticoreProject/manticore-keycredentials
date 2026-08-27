@@ -134,7 +134,8 @@ func targetFilter(options TargetOptions) (string, error) {
 
 	switch {
 	case options.DistinguishedName != "":
-		return fmt.Sprintf("(distinguishedName=%s)", options.DistinguishedName), nil
+		safeDN := ldapv3.EscapeFilter(options.DistinguishedName)
+		return fmt.Sprintf("(distinguishedName=%s)", safeDN), nil
 
 	case options.Filter != "":
 		return options.Filter, nil
@@ -150,7 +151,8 @@ func targetFilter(options TargetOptions) (string, error) {
 		var builder strings.Builder
 		builder.WriteString("(|")
 		for _, dn := range distinguishedNames {
-			builder.WriteString(fmt.Sprintf("(distinguishedName=%s)", dn))
+			safeDN := ldapv3.EscapeFilter(dn)
+			builder.WriteString(fmt.Sprintf("(distinguishedName=%s)", safeDN))
 		}
 		builder.WriteString(")")
 		return builder.String(), nil

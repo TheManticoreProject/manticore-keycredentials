@@ -88,7 +88,8 @@ func LogConnection(domain, username, domainController string, ldapPort int, useL
 //	The matching LDAP entry, or an error if the search failed or did not match
 //	exactly one object.
 func FindUniqueObject(ldapSession *ldap.Session, distinguishedName string, attributes []string, debug bool) (*ldapv3.Entry, error) {
-	query := fmt.Sprintf("(distinguishedName=%s)", distinguishedName)
+	safeDN := ldapv3.EscapeFilter(distinguishedName)
+	query := fmt.Sprintf("(distinguishedName=%s)", safeDN)
 	if debug {
 		logger.Debug(fmt.Sprintf("Querying ldap: %s", query))
 	}
