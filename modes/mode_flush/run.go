@@ -5,6 +5,7 @@ import (
 
 	"github.com/TheManticoreProject/Manticore/logger"
 
+	"github.com/TheManticoreProject/manticore-keycredentials/cli"
 	"github.com/TheManticoreProject/manticore-keycredentials/config"
 	"github.com/TheManticoreProject/manticore-keycredentials/utils"
 )
@@ -14,12 +15,13 @@ import (
 // Parameters:
 //
 //	distinguishedName (string): The distinguished name of the user.
+//	safety (cli.SafetyOptions): The confirmation flag.
 //	config (config.Config): The configuration of the application.
 //
 // Returns:
 //
 //	An error if the operation fails, nil otherwise.
-func Run(distinguishedName string, config config.Config) error {
+func Run(distinguishedName string, safety cli.SafetyOptions, config config.Config) error {
 	if config.Debug {
 		logger.Debug("Starting mode 'flush'")
 	}
@@ -45,8 +47,10 @@ func Run(distinguishedName string, config config.Config) error {
 		return err
 	}
 
+	dn := entry.GetAttributeValue("distinguishedName")
+	oldValues := entry.GetEqualFoldRawAttributeValues("msDS-KeyCredentialLink")
+
 	if config.Debug {
-		oldValues := entry.GetEqualFoldRawAttributeValues("msDS-KeyCredentialLink")
 		if len(oldValues) == 0 {
 			logger.Debug("msDS-KeyCredentialLink currently has no values")
 		} else {
@@ -57,8 +61,15 @@ func Run(distinguishedName string, config config.Config) error {
 		}
 	}
 
+	logger.Print(fmt.Sprintf("[>] Flushing all key credentials from (\x1b[93m1\x1b[0m):\n  └── \x1b[94m%s\x1b[0m", dn))
+	logger.Print("")
+
+	if !cli.ConfirmWrite("flush all key credentials from", 2, safety) {
+		return nil
+	}
+
 	err = ldapSession.FlushAttributeValues(
-		entry.GetAttributeValue("distinguishedName"),
+		dn,
 		"msDS-KeyCredentialLink",
 	)
 	if err != nil {

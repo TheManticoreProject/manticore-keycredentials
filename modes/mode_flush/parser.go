@@ -6,11 +6,13 @@ import (
 	"github.com/TheManticoreProject/manticore-keycredentials/cli"
 )
 
-func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *string, domainController *string, dcHost *string, ldapPort *int, useLdaps *bool, useKerberos *bool, dnsNameServer *string, authDomain *string, authUsername *string, authPassword *string, authHashes *string, authAesKey *string, authNoPass *bool, ticketCCache *string, ticketKirbi *string) {
+func SetupSubParser(ap *parser.ArgumentsParser, debug *bool, distinguishedName *string, safety *cli.SafetyOptions, domainController *string, dcHost *string, ldapPort *int, useLdaps *bool, useKerberos *bool, dnsNameServer *string, authDomain *string, authUsername *string, authPassword *string, authHashes *string, authAesKey *string, authNoPass *bool, ticketCCache *string, ticketKirbi *string) {
 	subparser_flush := ap.AddSubParser("flush", "Flush the msDS-KeyCredentialLink attribute of a target object.")
 	// Configuration
 	cli.RegisterConfigurationGroup(subparser_flush, debug)
 	subparser_flush.NewStringArgument(distinguishedName, "-D", "--distinguished-name", "", true, "Distinguished name of the target account.")
+	// Safety
+	cli.RegisterSafetyGroup(subparser_flush, safety)
 	// Shared groups
 	cli.RegisterLDAPConnectionSettingsGroup(subparser_flush, domainController, dcHost, ldapPort, useLdaps, useKerberos, dnsNameServer)
 	cli.RegisterAuthenticationGroup(subparser_flush, authDomain, authUsername, authNoPass)

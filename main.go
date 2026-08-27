@@ -93,7 +93,7 @@ func parseArgs() {
 	// find ==================================================================================================================
 	mode_find.SetupSubParser(&ap, &debug, &distinguishedName, &pfxCertificate, &pfxPassword, &pemFile, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// flush ==========================================================================================================================
-	mode_flush.SetupSubParser(&ap, &debug, &distinguishedName, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
+	mode_flush.SetupSubParser(&ap, &debug, &distinguishedName, &safetyOptions, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// list ==================================================================================================================
 	mode_list.SetupSubParser(&ap, &debug, &targetOptions, &domainController, &dcHost, &ldapPort, &useLdaps, &useKerberos, &dnsNameServer, &authDomain, &authUsername, &authPassword, &authHashes, &authAesKey, &authNoPass, &ticketCCache, &ticketKirbi)
 	// remove ==================================================================================================================
@@ -219,7 +219,7 @@ func dispatch(config config.Config) error {
 	case "find":
 		return mode_find.Run(distinguishedName, pfxCertificate, pfxPassword, pemFile, config)
 	case "flush":
-		return mode_flush.Run(distinguishedName, config)
+		return mode_flush.Run(distinguishedName, safetyOptions, config)
 	case "list":
 		return mode_list.Run(targetOptions, config)
 	case "remove":
